@@ -1,8 +1,0 @@
-/home/dumbl/WaterTankTest/build/CMakeFiles/exampleWaterTank.dir
-/home/dumbl/WaterTankTest/build/CMakeFiles/WaterTank.dir
-/home/dumbl/WaterTankTest/build/CMakeFiles/edit_cache.dir
-/home/dumbl/WaterTankTest/build/CMakeFiles/rebuild_cache.dir
-/home/dumbl/WaterTankTest/build/CMakeFiles/list_install_components.dir
-/home/dumbl/WaterTankTest/build/CMakeFiles/install.dir
-/home/dumbl/WaterTankTest/build/CMakeFiles/install/local.dir
-/home/dumbl/WaterTankTest/build/CMakeFiles/install/strip.dir

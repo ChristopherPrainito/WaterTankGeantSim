@@ -1,0 +1,31 @@
+# Ignore CMake build directories and common generated files
+
+# Primary build directory at repo root
+/build/
+
+# Alternative CMake build directory names (CLion/VSCode presets)
+/cmake-build-*/
+
+# If someone configures CMake in-source (not recommended), ignore generated files
+CMakeFiles/
+CMakeCache.txt
+cmake_install.cmake
+Makefile
+
+# Compiled objects and libraries
+*.o
+*.obj
+*.so
+*.a
+*.dylib
+*.dll
+*.exe
+
+# Misc
+*.swp
+*.swo
+*.tmp
+*.log
+
+# ROOT output files
+*.root
