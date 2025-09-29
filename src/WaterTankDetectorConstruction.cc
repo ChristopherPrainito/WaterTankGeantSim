@@ -36,7 +36,9 @@ WaterTankDetectorConstruction::~WaterTankDetectorConstruction()
 
 G4VPhysicalVolume* WaterTankDetectorConstruction::Construct()
 {  
-  // Get nist material manager
+  // Pull materials primarily from the NIST database. This keeps definitions of
+  // common materials (polypropylene, water, glass, air) centralized and avoids
+  // custom manual compositions unless necessary.
   G4NistManager* nist = G4NistManager::Instance();
   
   // Option to switch on/off checking of volumes overlaps
@@ -44,7 +46,7 @@ G4VPhysicalVolume* WaterTankDetectorConstruction::Construct()
  
   // --------------------------------------------------------------
   // Polypropylene cylindrical tank (shell) with ultrapure water fill
-  // Specs: inner diameter 71", wall thickness 0.5", height 36"
+  // Specs approximate the IceCube calibration test tank used on surface.
   // --------------------------------------------------------------
   G4double in = 2.54*cm; // inch in Geant4 units
 
@@ -91,6 +93,9 @@ G4VPhysicalVolume* WaterTankDetectorConstruction::Construct()
      70.*m
   };
 
+  // Attach wavelength-dependent optical constants so Cherenkov photons are
+  // refracted/absorbed realistically. Geant4 interpolates between these
+  // sample points when propagating optical photons.
   auto waterMPT = new G4MaterialPropertiesTable();
   waterMPT->AddProperty("RINDEX", photonEnergy, refractiveIndexWater, nOptPhotons);
   waterMPT->AddProperty("ABSLENGTH", photonEnergy, absorptionWater, nOptPhotons);
@@ -104,6 +109,8 @@ G4VPhysicalVolume* WaterTankDetectorConstruction::Construct()
   G4double worldHalfZ  = halfHeight + margin;
   G4Material* world_mat = nist->FindOrBuildMaterial("G4_AIR");
 
+  // The world is a simple box with a small clearance margin around the tank to
+  // avoid particles interacting immediately with boundaries.
   G4Box* solidWorld = new G4Box("World", worldHalfXY, worldHalfXY, worldHalfZ);
   G4LogicalVolume* logicWorld = new G4LogicalVolume(solidWorld, world_mat, "World");
   G4VPhysicalVolume* physWorld = new G4PVPlacement(
@@ -124,7 +131,9 @@ G4VPhysicalVolume* WaterTankDetectorConstruction::Construct()
     logicWorld, false, 0, checkOverlaps
   );
 
-  // Water volume inside the tank (slightly smaller to avoid surface coincidence)
+  // Water volume inside the tank. We shrink the radius/height ever so slightly
+  // to eliminate coincident surfaces, which otherwise produce navigation
+  // ambiguities for optical photons.
   G4double gap = 0.1*mm; // small tolerance
   G4Tubs* solidTankWater = new G4Tubs(
     "TankWater",
@@ -236,11 +245,17 @@ G4VPhysicalVolume* WaterTankDetectorConstruction::Construct()
     0.05
   };
 
+  // The optical surface encodes an effective detection efficiency curve. We
+  // treat it as a "metal" surface so that every photon either gets absorbed
+  // (triggering a hit) or reflected based on this curve.
   auto domSurfaceMPT = new G4MaterialPropertiesTable();
   domSurfaceMPT->AddProperty("EFFICIENCY", photonEnergy, domEfficiency, nOptPhotons);
   domSurfaceMPT->AddProperty("REFLECTIVITY", photonEnergy, domReflectivity, nOptPhotons);
   domOpticalSurface->SetMaterialPropertiesTable(domSurfaceMPT);
 
+  // Bind the optical surface to the physical interface bordering water and the
+  // DOM. The sensitive detector will later query this same surface to decide
+  // whether an incident photon is recorded as a hit.
   if (fWaterPhysicalVolume && fDOMPhysicalVolume) {
     new G4LogicalBorderSurface("DOMOpticalSurfaceBorder",
                                fWaterPhysicalVolume,
@@ -248,7 +263,7 @@ G4VPhysicalVolume* WaterTankDetectorConstruction::Construct()
                                domOpticalSurface);
   }
 
-  // Set scoring volume to the water inside the tank
+  // Steps inside the water tank drive the energy deposition bookkeeping.
   fScoringVolume = logicTankWater;
 
   //
@@ -259,7 +274,8 @@ G4VPhysicalVolume* WaterTankDetectorConstruction::Construct()
 
 void WaterTankDetectorConstruction::ConstructSDandField()
 {
-  // Create sensitive detector for DOM
+  // Create sensitive detector for DOM. This converts optical photons that
+  // enter the DOM into hits and records their kinematics.
   G4String DOMSDname = "WaterTank/DOMSD";
   WaterTankDOMSD* domSD = new WaterTankDOMSD(DOMSDname, "DOMHitsCollection");
   domSD->SetDOMPhysicalVolume(fDOMPhysicalVolume);

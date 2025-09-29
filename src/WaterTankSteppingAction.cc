@@ -23,6 +23,8 @@ WaterTankSteppingAction::~WaterTankSteppingAction()
 void WaterTankSteppingAction::UserSteppingAction(const G4Step* step)
 {
   if (!fScoringVolume) { 
+    // Lazy-fetch the scoring volume from the detector construction. Doing this
+    // once avoids querying the geometry store on every step.
     const WaterTankDetectorConstruction* detectorConstruction
       = static_cast<const WaterTankDetectorConstruction*>
         (G4RunManager::GetRunManager()->GetUserDetectorConstruction());
@@ -42,6 +44,8 @@ void WaterTankSteppingAction::UserSteppingAction(const G4Step* step)
   if (step->GetTrack()->GetDefinition() == G4OpticalPhoton::OpticalPhotonDefinition()) {
     return;
   }
+  // Feed the energy deposit to the event action which will forward it to the
+  // run action at the end of the event. This supports both ST and MT modes.
   G4double edepStep = step->GetTotalEnergyDeposit();
   fEventAction->AddEdep(edepStep);  
 

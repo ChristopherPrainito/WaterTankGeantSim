@@ -28,6 +28,9 @@ WaterTankEventAction::~WaterTankEventAction()
 
 void WaterTankEventAction::BeginOfEventAction(const G4Event*)
 {    
+  // Reset per-event accumulators. The stepping action will add deposited
+  // energy, while the sensitive detector will populate hits which we count at
+  // the end of the event.
   fEdep = 0.;
   fDetectionCount = 0;
 }
@@ -39,7 +42,8 @@ void WaterTankEventAction::EndOfEventAction(const G4Event* event)
   auto analysisManager = G4AnalysisManager::Instance();
   const G4int eventId = event->GetEventID();
 
-  // Retrieve DOM hits collection and count detections
+  // Retrieve DOM hits collection and count detections. We cache the collection
+  // ID after the first lookup to avoid repeated string-based searches.
   auto hce = event->GetHCofThisEvent();
   WaterTankDOMHitsCollection* domHits = nullptr;
   if (hce) {
@@ -58,6 +62,8 @@ void WaterTankEventAction::EndOfEventAction(const G4Event* event)
   analysisManager->FillNtupleIColumn(0, 2, fDetectionCount);
   analysisManager->AddNtupleRow(0);
 
+  // Populate the hits ntuple with one row per DOM detection. Units are chosen
+  // to be human-friendly (ns, eV, nm, cm) for downstream analysis in ROOT.
   if (domHits) {
     for (G4int ihit = 0; ihit < domHits->entries(); ++ihit) {
       auto hit = (*domHits)[ihit];

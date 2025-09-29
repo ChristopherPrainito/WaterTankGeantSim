@@ -10,11 +10,12 @@
 
 class G4Run;
 
-/// Run action class
+/// Collects run-wide observables and manages persistent output.
 ///
-/// In EndOfRunAction(), it calculates the dose in the selected volume 
-/// from the energy deposit accumulated via stepping and event actions.
-/// The computed dose is then printed on the screen.
+/// The run action owns Geant4 accumulables that receive energy deposition
+/// contributions from the stepping action. It opens the ROOT output file,
+/// defines ntuples for event and DOM hit summaries, and at the end of the run
+/// computes statistics before writing results to disk.
 
 class WaterTankRunAction : public G4UserRunAction
 {
@@ -22,16 +23,20 @@ class WaterTankRunAction : public G4UserRunAction
     WaterTankRunAction();
     virtual ~WaterTankRunAction();
 
-    // virtual G4Run* GenerateRun();
-    virtual void BeginOfRunAction(const G4Run*);
-    virtual void   EndOfRunAction(const G4Run*);
+  // virtual G4Run* GenerateRun();
+  virtual void BeginOfRunAction(const G4Run*);
+  virtual void   EndOfRunAction(const G4Run*);
 
-    void AddEdep (G4double edep); 
+  /// Thread-safe way to accumulate deposited energy.
+  void AddEdep (G4double edep);
 
   private:
-    G4Accumulable<G4double> fEdep;
-    G4Accumulable<G4double> fEdep2;
-    G4float m_segment;
+  /// Sum of deposited energy across the run (uses Geant4 accumulables).
+  G4Accumulable<G4double> fEdep;
+  /// Sum of squared deposited energy to compute RMS.
+  G4Accumulable<G4double> fEdep2;
+  /// Histogram bin width (kept for potential calorimeter maps).
+  G4float m_segment;
 };
 
 #endif

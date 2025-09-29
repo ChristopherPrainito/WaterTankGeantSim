@@ -6,7 +6,11 @@
 
 #include "G4VUserActionInitialization.hh"
 
-/// Action initialization class.
+/// Bootstraps per-run and per-thread user actions.
+///
+/// Geant4 asks this object to provide the concrete primary generator,
+/// run, event, and stepping actions both for the master thread and worker
+/// threads. This is where the simulation wiring between components lives.
 
 class WaterTankActionInitialization : public G4VUserActionInitialization
 {

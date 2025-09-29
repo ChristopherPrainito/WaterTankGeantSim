@@ -12,10 +12,12 @@ class G4ParticleGun;
 class G4Event;
 class G4Box;
 
-/// The primary generator action class with particle gun.
+/// Configures the primary particle gun that seeds each event.
 ///
-/// The default kinematic is a 6 MeV gamma, randomly distribued 
-/// in front of the phantom across 80% of the (X,Y) phantom size.
+/// The current setup launches a single down-going 4 GeV muon from just
+/// outside the world boundary and aims it straight through the tank.
+/// This mimics a cosmic-ray muon traversing the water volume and producing
+/// secondary Cherenkov photons that can trigger the DOM.
 
 class WaterTankPrimaryGeneratorAction : public G4VUserPrimaryGeneratorAction
 {
@@ -30,8 +32,10 @@ class WaterTankPrimaryGeneratorAction : public G4VUserPrimaryGeneratorAction
     const G4ParticleGun* GetParticleGun() const { return fParticleGun; }
   
   private:
-    G4ParticleGun*  fParticleGun; // pointer a to G4 gun class
-    G4Box* fEnvelopeBox;
+  /// Owned particle gun instance shared across events.
+  G4ParticleGun*  fParticleGun; // pointer a to G4 gun class
+  /// Cached world box so we can position the muon source relative to it.
+  G4Box* fEnvelopeBox;
 };
 
 #endif

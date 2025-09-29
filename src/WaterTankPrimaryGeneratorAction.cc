@@ -21,7 +21,8 @@ WaterTankPrimaryGeneratorAction::WaterTankPrimaryGeneratorAction()
   G4int n_particle = 1;
   fParticleGun  = new G4ParticleGun(n_particle);
 
-  // default particle kinematic
+  // Default particle kinematics: a single downward-going muon that will
+  // produce Cherenkov light as it traverses the water volume.
   G4ParticleTable* particleTable = G4ParticleTable::GetParticleTable();
   G4String particleName;
   G4ParticleDefinition* particle
@@ -38,8 +39,8 @@ WaterTankPrimaryGeneratorAction::~WaterTankPrimaryGeneratorAction()
 
 void WaterTankPrimaryGeneratorAction::GeneratePrimaries(G4Event* anEvent)
 {
-  //this function is called at the begining of each event
-  //
+  // Called once per event to spawn the primary vertex. We orient the muon
+  // along +Z and release it just inside the negative Z boundary of the world.
 
   // In order to avoid dependence of PrimaryGeneratorAction
   // on DetectorConstruction class we get World volume
@@ -68,7 +69,9 @@ void WaterTankPrimaryGeneratorAction::GeneratePrimaries(G4Event* anEvent)
      "MyCode0002",JustWarning,msg);
   }
 
-  // Start muons just outside the world boundary on -Z and shoot toward +Z
+  // Start muons just outside the world boundary on -Z and shoot toward +Z.
+  // Randomizing the starting point later would emulate an angular spread of
+  // cosmic rays; for now we keep it deterministic for easier debugging.
   G4double x0 = 0.0;
   G4double y0 = 0.0;
   G4double z0 = -0.5 * envSizeZ + 1.*mm; // slightly inside world to avoid starting outside

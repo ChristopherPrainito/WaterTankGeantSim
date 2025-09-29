@@ -11,8 +11,12 @@ class WaterTankEventAction;
 
 class G4LogicalVolume;
 
-/// Stepping action class
-/// 
+/// Collects step-level energy deposition inside the scoring volume.
+///
+/// Every step, the action checks whether we are inside the water volume used
+/// for calorimetry. Non-optical tracks contribute their deposited energy to the
+/// event action, while optical photons are ignored to avoid double-counting
+/// energy carried by Cherenkov light.
 
 class WaterTankSteppingAction : public G4UserSteppingAction
 {
@@ -24,7 +28,9 @@ class WaterTankSteppingAction : public G4UserSteppingAction
     virtual void UserSteppingAction(const G4Step*);
 
   private:
+    /// Event action that aggregates per-event energy totals.
     WaterTankEventAction*  fEventAction;
+    /// Cached pointer to the water scoring volume for quick comparisons.
     G4LogicalVolume* fScoringVolume;
 };
 

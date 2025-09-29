@@ -21,6 +21,8 @@ WaterTankDOMHit::WaterTankDOMHit()
 WaterTankDOMHit::WaterTankDOMHit(const WaterTankDOMHit& rhs)
 : G4VHit()
 {
+  // Explicitly copy every member so that hits can be stored in STL containers
+  // and safely cloned across threads if required.
   fTime         = rhs.fTime;
   fPosition     = rhs.fPosition;
   fDirection    = rhs.fDirection;

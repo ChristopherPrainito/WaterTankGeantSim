@@ -23,14 +23,14 @@ WaterTankRunAction::WaterTankRunAction()
   fEdep(0.),
   fEdep2(0.)
 { 
-  // Register accumulable to the accumulable manager
+  // Register accumulable to the accumulable manager so that thread-local
+  // contributions automatically merge at the end of the run.
   G4AccumulableManager* accumulableManager = G4AccumulableManager::Instance();
   accumulableManager->Register(fEdep);
   accumulableManager->Register(fEdep2);
 
-  // Create analysis manager
-  // The choice of analysis technology is done via selection of a namespace
-  // in WaterTankAnalysis.hh
+  // Hook up the Geant4 analysis manager. The header WaterTankAnalysis.hh can be
+  // used to swap out the backend if we ever want CSV or XML instead of ROOT.
   auto analysisManager = G4AnalysisManager::Instance();
   G4cout << "Using " << analysisManager->GetType() << G4endl;
 
@@ -38,12 +38,17 @@ WaterTankRunAction::WaterTankRunAction()
   analysisManager->SetVerboseLevel(1);
   if ( G4Threading::IsMultithreadedApplication() ) analysisManager->SetNtupleMerging(true);
 
+  // Event-level summary ntuple: one row per event capturing how much energy
+  // was deposited in the water and how many DOM hits were recorded.
   analysisManager->CreateNtuple("event", "Event summary");
   analysisManager->CreateNtupleIColumn("EventID");
   analysisManager->CreateNtupleDColumn("Edep_GeV");
   analysisManager->CreateNtupleIColumn("DOMHitCount");
   analysisManager->FinishNtuple();
 
+  // Detailed DOM hit ntuple: one row per detected photon with position,
+  // direction, and provenance. This provides the raw material for timing and
+  // angular studies when reviewing the simulation output in ROOT.
   analysisManager->CreateNtuple("domhits", "DOM photon hits");
   analysisManager->CreateNtupleIColumn("EventID");
   analysisManager->CreateNtupleIColumn("TrackID");
@@ -81,6 +86,8 @@ void WaterTankRunAction::BeginOfRunAction(const G4Run*)
   G4String material = scoringVolume->GetMaterial()->GetName();
   G4cout << "RADIATION LENGTH: " << scoringVolume->GetMaterial()->GetRadlen() << G4endl;
 
+  // Write output to a deterministic filename unless changed via macro. ROOT
+  // will append a thread suffix automatically when ntuple merging is disabled.
   G4String fileName = "output_default.root";
   analysisManager->OpenFile(fileName);
 
@@ -157,7 +164,9 @@ void WaterTankRunAction::EndOfRunAction(const G4Run* run)
   G4double rms = edep2 - edep*edep;
   if (rms > 0.) rms = std::sqrt(rms); else rms = 0.;  
 
-  // Run conditions
+  // Summarize run conditions for the log so we can cross-check energy and
+  // particle species when reviewing outputs. Note: in MT mode the master does
+  // not have a primary generator, so we guard against null pointers.
   //  note: There is no primary generator action object for "master"
   //        run manager for multi-threaded mode.
   const WaterTankPrimaryGeneratorAction* generatorAction
@@ -196,8 +205,8 @@ void WaterTankRunAction::EndOfRunAction(const G4Run* run)
      << "------------------------------------------------------------"
      << G4endl
      << G4endl;
-  // save histograms & ntuple
-  //
+  // Persist histograms and ntuples. The analysis manager owns the file handle,
+  // so CloseFile() also triggers writing any buffered data to disk.
   auto analysisManager = G4AnalysisManager::Instance();
   analysisManager->Write();
   analysisManager->CloseFile();
@@ -205,6 +214,8 @@ void WaterTankRunAction::EndOfRunAction(const G4Run* run)
 
 void WaterTankRunAction::AddEdep(G4double edep)
 {
+  // Geant4 accumulables act like thread-local reduction variables. Each call
+  // simply adds to the running sum and the merge happens automatically later.
   fEdep  += edep;
   fEdep2 += edep*edep;
 }

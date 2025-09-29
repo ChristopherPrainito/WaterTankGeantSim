@@ -35,6 +35,9 @@ WaterTankDOMSD::~WaterTankDOMSD()
 
 void WaterTankDOMSD::Initialize(G4HCofThisEvent* hce)
 {
+  // Allocate a fresh hits collection at the beginning of each event. The
+  // sensitive detector base class ensures ownership is transferred to the
+  // event when we add it via AddHitsCollection.
   fHitsCollection = new WaterTankDOMHitsCollection(SensitiveDetectorName, collectionName[0]);
 
   if (fHitsCollectionID < 0) {
@@ -49,11 +52,15 @@ void WaterTankDOMSD::Initialize(G4HCofThisEvent* hce)
 G4bool WaterTankDOMSD::ProcessHits(G4Step* aStep, 
                                    G4TouchableHistory*)
 {  
+  // Only optical photons are relevant for DOM detections; all charged
+  // particles are handled elsewhere (e.g., energy deposition in water).
   auto track = aStep->GetTrack();
   if (track->GetDefinition() != G4OpticalPhoton::OpticalPhotonDefinition()) {
     return false;
   }
 
+  // Bail out early if the detector has not yet been wired with the DOM and
+  // water physical volumes. This protects against partial construction states.
   if (!fDOMPhysicalVolume || !fWaterPhysicalVolume) {
     return false;
   }
@@ -91,6 +98,8 @@ G4bool WaterTankDOMSD::ProcessHits(G4Step* aStep,
   // Determine detection probability from optical surface, if available
   G4double detectionProbability = 1.0;
   if (!fDOMOpticalSurfaceName.empty()) {
+    // Look up the logical border surface spanning water -> DOM. The optical
+    // efficiency property captures the DOM quantum efficiency vs. wavelength.
     const G4LogicalBorderSurface* borderSurface =
       G4LogicalBorderSurface::GetSurface(preVolume, postVolume);
     if (!borderSurface) {
@@ -120,6 +129,8 @@ G4bool WaterTankDOMSD::ProcessHits(G4Step* aStep,
     return false;
   }
 
+  // At this point the photon is deemed detected. Build a hit object capturing
+  // arrival time, position, direction, and provenance for downstream analysis.
   auto hit = new WaterTankDOMHit();
   hit->SetTime(postPoint->GetGlobalTime());
   hit->SetPosition(postPoint->GetPosition());
@@ -144,6 +155,8 @@ G4bool WaterTankDOMSD::ProcessHits(G4Step* aStep,
          << " wavelength=" << wavelength/nm << " nm"
          << G4endl;
 
+  // Terminate the optical photon track once it has triggered the DOM to avoid
+  // double-counting or spurious reflections in later optical surfaces.
   track->SetTrackStatus(fStopAndKill);
 
   return true;
