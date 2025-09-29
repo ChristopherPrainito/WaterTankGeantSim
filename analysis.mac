@@ -1,0 +1,14 @@
+/control/verbose 0
+/run/verbose 0
+/event/verbose 0
+/tracking/verbose 0
+
+/run/numberOfThreads 1
+/run/initialize
+
+/my/analysis/enable true
+/my/analysis/fileName run_001.root    # change to .xml if you only have g4tools
+/my/analysis/saveHits false             # switch to true to write the hits ntuple
+#/my/analysis/planarFace true           # enable if your DOM has a planar photocathode
+
+/run/beamOn 10

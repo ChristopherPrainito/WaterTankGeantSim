@@ -4,8 +4,10 @@
 #include "WaterTankDetectorConstruction.hh"
 #include "WaterTankActionInitialization.hh"
 #include "QBBC.hh"
+#include "Analysis.hh"
 
 #include "G4RunManagerFactory.hh"
+#include "G4MTRunManager.hh"
 #include "G4SteppingVerbose.hh"
 #include "G4UIExecutive.hh"
 #include "G4UImanager.hh"
@@ -13,7 +15,6 @@
 #include "G4OpticalPhysics.hh"
 #include "G4OpticalParameters.hh"
 #include <iostream>  // Add this line
-#include "G4AnalysisManager.hh"
 
 //#include "Randomize.hh"
 
@@ -38,13 +39,13 @@ int main(int argc,char** argv)
   G4int precision = 4;
   G4SteppingVerbose::UseBestUnit(precision);
 
-  // Ensure that individual worker threads merge their ntuples before writing
-  // to disk. This keeps output in a single ROOT file even in MT mode.
-  G4AnalysisManager::Instance()->SetNtupleMerging(true);
-
   // Construct the default run manager which owns the detector geometry and
   // orchestrates event processing.
-  auto runManager = G4RunManagerFactory::CreateRunManager(G4RunManagerType::Default);
+  auto runManager = G4RunManagerFactory::CreateRunManager(G4RunManagerType::SerialOnly);
+
+  // Ensure the analysis singleton (and its UI messenger) is created before any
+  // macro commands try to configure it.
+  Analysis::Instance();
 
   // Plug in the detector construction which describes the water tank and DOM
   // geometry as well as the material optical properties.

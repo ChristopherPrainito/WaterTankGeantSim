@@ -3,6 +3,7 @@
 
 #include "WaterTankDOMSD.hh"
 
+#include "Analysis.hh"
 #include "WaterTankDOMHit.hh"
 
 #include "G4HCofThisEvent.hh"
@@ -18,8 +19,11 @@
 #include "G4MaterialPropertyVector.hh"
 #include "G4OpticalSurface.hh"
 #include "G4VPhysicalVolume.hh"
+#include "G4VSolid.hh"
+#include "G4AffineTransform.hh"
 #include <Randomize.hh>
 #include <algorithm>
+#include <limits>
 
 WaterTankDOMSD::WaterTankDOMSD(const G4String& name,
                                const G4String& hitsCollectionName) 
@@ -131,10 +135,11 @@ G4bool WaterTankDOMSD::ProcessHits(G4Step* aStep,
 
   // At this point the photon is deemed detected. Build a hit object capturing
   // arrival time, position, direction, and provenance for downstream analysis.
+  const G4ThreeVector momentumDir = postPoint->GetMomentumDirection().unit();
   auto hit = new WaterTankDOMHit();
   hit->SetTime(postPoint->GetGlobalTime());
   hit->SetPosition(postPoint->GetPosition());
-  hit->SetDirection(postPoint->GetMomentumDirection().unit());
+  hit->SetDirection(momentumDir);
 
   hit->SetPhotonEnergy(photonEnergy);
 
@@ -146,7 +151,42 @@ G4bool WaterTankDOMSD::ProcessHits(G4Step* aStep,
   hit->SetTrackID(track->GetTrackID());
   hit->SetParentID(track->GetParentID());
 
+  const G4double timeNs = postPoint->GetGlobalTime() / ns;
+  const G4double wavelengthNm = wavelength / nm;
+  G4double cosTheta = std::numeric_limits<G4double>::quiet_NaN();
+  G4double x_mm = std::numeric_limits<G4double>::quiet_NaN();
+  G4double y_mm = std::numeric_limits<G4double>::quiet_NaN();
+
+  auto touchable = postPoint->GetTouchableHandle();
+  if (touchable) {
+    const G4AffineTransform transform = touchable->GetHistory()->GetTopTransform();
+    const G4ThreeVector globalPos = postPoint->GetPosition();
+    const G4ThreeVector localPos = transform.Inverse().TransformPoint(globalPos);
+    x_mm = localPos.x() / mm;
+    y_mm = localPos.y() / mm;
+
+    const auto volume = touchable->GetVolume();
+    if (volume) {
+      const auto logical = volume->GetLogicalVolume();
+      if (logical) {
+        const auto solid = logical->GetSolid();
+        if (solid) {
+          G4ThreeVector localNormal = solid->SurfaceNormal(localPos);
+          if (localNormal.mag2() > 0.) {
+            G4ThreeVector globalNormal = transform.TransformAxis(localNormal.unit());
+            if (globalNormal.mag2() > 0.) {
+              cosTheta = (-globalNormal.unit()).dot(momentumDir);
+              cosTheta = std::max(-1.0, std::min(1.0, cosTheta));
+            }
+          }
+        }
+      }
+    }
+  }
+
   fHitsCollection->insert(hit);
+
+  Analysis::Instance().CountPE(timeNs, wavelengthNm, cosTheta, x_mm, y_mm);
 
   G4cout << "DOM HIT: track=" << track->GetTrackID()
          << " parent=" << track->GetParentID()

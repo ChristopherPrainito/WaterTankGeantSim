@@ -4,7 +4,7 @@
 #include "WaterTankRunAction.hh"
 #include "WaterTankPrimaryGeneratorAction.hh"
 #include "WaterTankDetectorConstruction.hh"
-#include "WaterTankAnalysis.hh"
+#include "Analysis.hh"
 // #include "WaterTankRun.hh"
 
 #include "G4RunManager.hh"
@@ -14,7 +14,6 @@
 #include "G4LogicalVolume.hh"
 #include "G4UnitsTable.hh"
 #include "G4SystemOfUnits.hh"
-#include "G4AnalysisManager.hh"
 #include "globals.hh"
 #include "G4Run.hh"
 
@@ -29,41 +28,6 @@ WaterTankRunAction::WaterTankRunAction()
   accumulableManager->Register(fEdep);
   accumulableManager->Register(fEdep2);
 
-  // Hook up the Geant4 analysis manager. The header WaterTankAnalysis.hh can be
-  // used to swap out the backend if we ever want CSV or XML instead of ROOT.
-  auto analysisManager = G4AnalysisManager::Instance();
-  G4cout << "Using " << analysisManager->GetType() << G4endl;
-
-  // Create directories 
-  analysisManager->SetVerboseLevel(1);
-  if ( G4Threading::IsMultithreadedApplication() ) analysisManager->SetNtupleMerging(true);
-
-  // Event-level summary ntuple: one row per event capturing how much energy
-  // was deposited in the water and how many DOM hits were recorded.
-  analysisManager->CreateNtuple("event", "Event summary");
-  analysisManager->CreateNtupleIColumn("EventID");
-  analysisManager->CreateNtupleDColumn("Edep_GeV");
-  analysisManager->CreateNtupleIColumn("DOMHitCount");
-  analysisManager->FinishNtuple();
-
-  // Detailed DOM hit ntuple: one row per detected photon with position,
-  // direction, and provenance. This provides the raw material for timing and
-  // angular studies when reviewing the simulation output in ROOT.
-  analysisManager->CreateNtuple("domhits", "DOM photon hits");
-  analysisManager->CreateNtupleIColumn("EventID");
-  analysisManager->CreateNtupleIColumn("TrackID");
-  analysisManager->CreateNtupleIColumn("ParentID");
-  analysisManager->CreateNtupleDColumn("Time_ns");
-  analysisManager->CreateNtupleDColumn("Energy_eV");
-  analysisManager->CreateNtupleDColumn("Wavelength_nm");
-  analysisManager->CreateNtupleDColumn("PosX_cm");
-  analysisManager->CreateNtupleDColumn("PosY_cm");
-  analysisManager->CreateNtupleDColumn("PosZ_cm");
-  analysisManager->CreateNtupleDColumn("DirX");
-  analysisManager->CreateNtupleDColumn("DirY");
-  analysisManager->CreateNtupleDColumn("DirZ");
-  analysisManager->FinishNtuple();
-
 }
 
 WaterTankRunAction::~WaterTankRunAction()
@@ -71,14 +35,12 @@ WaterTankRunAction::~WaterTankRunAction()
   //delete G4AnalysisManager::Instance();  
 }
 
-void WaterTankRunAction::BeginOfRunAction(const G4Run*)
+void WaterTankRunAction::BeginOfRunAction(const G4Run* run)
 { 
   // inform the runManager to save random number seed
   G4RunManager::GetRunManager()->SetRandomNumberStore(false);
   
   // Get analysis manager
-  auto analysisManager = G4AnalysisManager::Instance();
-  
   const WaterTankDetectorConstruction* detectorConstruction
       = static_cast<const WaterTankDetectorConstruction*>
         (G4RunManager::GetRunManager()->GetUserDetectorConstruction());
@@ -88,8 +50,8 @@ void WaterTankRunAction::BeginOfRunAction(const G4Run*)
 
   // Write output to a deterministic filename unless changed via macro. ROOT
   // will append a thread suffix automatically when ntuple merging is disabled.
-  G4String fileName = "output_default.root";
-  analysisManager->OpenFile(fileName);
+  const G4int runID = run ? run->GetRunID() : -1;
+  Analysis::Instance().BeginRun(runID);
 
   //if (!IsMaster()) {
   //  const WaterTankPrimaryGeneratorAction* generatorAction =
@@ -207,9 +169,7 @@ void WaterTankRunAction::EndOfRunAction(const G4Run* run)
      << G4endl;
   // Persist histograms and ntuples. The analysis manager owns the file handle,
   // so CloseFile() also triggers writing any buffered data to disk.
-  auto analysisManager = G4AnalysisManager::Instance();
-  analysisManager->Write();
-  analysisManager->CloseFile();
+  Analysis::Instance().EndRun();
 }
 
 void WaterTankRunAction::AddEdep(G4double edep)

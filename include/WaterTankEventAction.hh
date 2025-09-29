@@ -28,6 +28,9 @@ class WaterTankEventAction : public G4UserEventAction
 
     /// Accumulate step-level energy deposition into the event total.
     void AddEdep(G4double edep) { fEdep += edep; }
+
+    /// Record the scintillator trigger time for the current event (optional).
+    void SetScintillatorTime(G4double t_ns) { fTScintNs = t_ns; }
   private:
     /// Back-pointer used to flush event totals into run-level accumulators.
     WaterTankRunAction* fRunAction;
@@ -37,6 +40,8 @@ class WaterTankEventAction : public G4UserEventAction
     G4int        fDetectionCount;
     /// Cached DOM hits collection ID to avoid repeated lookups.
     G4int        fDOMHCID;
+    /// Time of scintillator trigger (ns) if provided, NaN otherwise.
+    G4double     fTScintNs;
 };
 
 #endif

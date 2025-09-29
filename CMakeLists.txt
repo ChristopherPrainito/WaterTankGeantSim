@@ -37,6 +37,13 @@ file(GLOB headers ${PROJECT_SOURCE_DIR}/include/*.hh)
 add_executable(exampleWaterTank exampleWaterTank.cc ${sources} ${headers})
 target_link_libraries(exampleWaterTank ${Geant4_LIBRARIES})
 
+# Prefer ROOT backend when available, otherwise fall back to g4tools XML.
+if(Geant4_g4root_FOUND)
+  target_compile_definitions(exampleWaterTank PRIVATE G4ANALYSIS_USE_ROOT)
+elseif(Geant4_g4xml_FOUND)
+  target_compile_definitions(exampleWaterTank PRIVATE G4ANALYSIS_USE_XML)
+endif()
+
 #----------------------------------------------------------------------------
 # Copy all scripts to the build directory, i.e. the directory in which we
 # build WaterTank. This is so that we can run the executable directly because it
