@@ -1,0 +1,16 @@
+# Initialize run
+/run/initialize
+
+# Test single muon mode first (default)
+/run/verbose 1
+/event/verbose 0
+/run/printProgress 1
+
+# Run 3 events with single muon
+/run/beamOn 3
+
+# Switch to CRY mode  
+/watertank/generator/useCRY true
+
+# Run 3 events with CRY
+/run/beamOn 3

@@ -23,6 +23,25 @@ endif()
 include(${Geant4_USE_FILE})
 include_directories(${PROJECT_SOURCE_DIR}/include)
 
+#----------------------------------------------------------------------------
+# Find and setup CRY cosmic ray shower library
+#
+set(CRY_DIR ${PROJECT_SOURCE_DIR}/cry_v1.7)
+set(CRY_LIB_DIR ${CRY_DIR}/lib)
+set(CRY_INC_DIR ${CRY_DIR}/src)
+set(CRY_DATA_DIR ${CRY_DIR}/data)
+
+# Check if CRY library exists
+if(NOT EXISTS ${CRY_LIB_DIR}/libCRY.a)
+    message(FATAL_ERROR "CRY library not found at ${CRY_LIB_DIR}/libCRY.a. Please build CRY first.")
+endif()
+
+# Add CRY include directory
+include_directories(${CRY_INC_DIR})
+
+# Define CRY_DATA preprocessor definition for the data path
+add_definitions(-DCRY_DATA="${CRY_DATA_DIR}")
+
 
 #----------------------------------------------------------------------------
 # Locate sources and headers for this project
@@ -35,7 +54,7 @@ file(GLOB headers ${PROJECT_SOURCE_DIR}/include/*.hh)
 # Add the executable, and link it to the Geant4 libraries
 #
 add_executable(exampleWaterTank exampleWaterTank.cc ${sources} ${headers})
-target_link_libraries(exampleWaterTank ${Geant4_LIBRARIES})
+target_link_libraries(exampleWaterTank ${Geant4_LIBRARIES} ${CRY_LIB_DIR}/libCRY.a)
 
 #----------------------------------------------------------------------------
 # Copy all scripts to the build directory, i.e. the directory in which we
@@ -45,6 +64,9 @@ target_link_libraries(exampleWaterTank ${Geant4_LIBRARIES})
 set(EXAMPLEWaterTank_SCRIPTS
   init_vis.mac
   vis.mac
+  cry_setup.file
+  test_cry.mac
+  test_cry_simple.mac
   )
 
 foreach(_script ${EXAMPLEWaterTank_SCRIPTS})

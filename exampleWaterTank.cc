@@ -12,7 +12,7 @@
 #include "G4VisExecutive.hh"
 #include "G4OpticalPhysics.hh"
 #include "G4OpticalParameters.hh"
-#include <iostream>  // Add this line
+#include <iostream>
 #include "G4AnalysisManager.hh"
 
 //#include "Randomize.hh"
@@ -34,7 +34,7 @@ int main(int argc,char** argv)
   // G4Random::setTheEngine(new CLHEP::MTwistEngine);
   
   // Use the verbose stepping helper that prints coordinates with units to aid
-  // in debugging geometry boundaries during development runs.
+  // in geometry validation during development runs.
   G4int precision = 4;
   G4SteppingVerbose::UseBestUnit(precision);
 

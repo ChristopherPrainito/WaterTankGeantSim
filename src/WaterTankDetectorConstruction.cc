@@ -102,15 +102,14 @@ G4VPhysicalVolume* WaterTankDetectorConstruction::Construct()
   matWater->SetMaterialPropertiesTable(waterMPT);
 
   // --------------------------------------------------------------
-  // World: just air with a small margin around the tank
+  // World: air volume sized for cosmic ray simulation
   // --------------------------------------------------------------
-  G4double margin = 20*cm; // adjustable "bit of margin"
-  G4double worldHalfXY = outerRadius + margin;
-  G4double worldHalfZ  = halfHeight + margin;
+  G4double worldHalfXY = 3*m;  // 3m half-width provides adequate simulation volume
+  G4double worldHalfZ  = 3*m;  // 3m half-height allows full particle trajectories
   G4Material* world_mat = nist->FindOrBuildMaterial("G4_AIR");
 
-  // The world is a simple box with a small clearance margin around the tank to
-  // avoid particles interacting immediately with boundaries.
+  // The world volume provides sufficient space for particle generation
+  // and propagation while avoiding boundary effects.
   G4Box* solidWorld = new G4Box("World", worldHalfXY, worldHalfXY, worldHalfZ);
   G4LogicalVolume* logicWorld = new G4LogicalVolume(solidWorld, world_mat, "World");
   G4VPhysicalVolume* physWorld = new G4PVPlacement(

@@ -175,11 +175,15 @@ void WaterTankRunAction::EndOfRunAction(const G4Run* run)
   G4String runCondition;
   if (generatorAction)
   {
-    const G4ParticleGun* particleGun = generatorAction->GetParticleGun();
-    runCondition += particleGun->GetParticleDefinition()->GetParticleName();
-    runCondition += " of ";
-    G4double particleEnergy = particleGun->GetParticleEnergy();
-    runCondition += G4BestUnit(particleEnergy,"Energy");
+    if (generatorAction->GetUseCRY()) {
+      runCondition += "CRY cosmic ray shower events";
+    } else {
+      const G4ParticleGun* particleGun = generatorAction->GetParticleGun();
+      runCondition += particleGun->GetParticleDefinition()->GetParticleName();
+      runCondition += " of ";
+      G4double particleEnergy = particleGun->GetParticleEnergy();
+      runCondition += G4BestUnit(particleEnergy,"Energy");
+    }
   }
         
   // Print
