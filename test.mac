@@ -1,6 +1,18 @@
-/control/verbose 0
-/run/verbose 0
-/event/verbose 0
-/tracking/verbose 0
+# Basic single muon test simulation
+# This macro runs a simple test with 10 single muon events
+# for quick validation of the detector setup and physics
+
+# Initialize the simulation
 /run/initialize
-/run/beamOn 1
+
+# Set verbosity levels for basic feedback
+/run/verbose 1
+/event/verbose 0
+/run/printProgress 5
+
+# Configure single muon generator (default mode)
+# Default: 4 GeV muon along -Z direction from above tank
+/watertank/generator/useCRY false
+
+# Run 10 single muon events for basic testing
+/run/beamOn 10

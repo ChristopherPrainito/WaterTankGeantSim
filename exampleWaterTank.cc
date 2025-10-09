@@ -15,9 +15,7 @@
 #include <iostream>
 #include "G4AnalysisManager.hh"
 
-//#include "Randomize.hh"
-
-// Entry point that configures the Geant4 run manager, physics list, and
+/// Entry point that configures the Geant4 run manager, physics list, and
 // visualization stack before either running in batch mode or opening an
 // interactive UI session.
 int main(int argc,char** argv)
@@ -30,9 +28,6 @@ int main(int argc,char** argv)
     ui = new G4UIExecutive(argc, argv);
   }
 
-  // Optionally: choose a different Random engine...
-  // G4Random::setTheEngine(new CLHEP::MTwistEngine);
-  
   // Use the verbose stepping helper that prints coordinates with units to aid
   // in geometry validation during development runs.
   G4int precision = 4;
