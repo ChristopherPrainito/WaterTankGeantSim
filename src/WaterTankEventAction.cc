@@ -13,6 +13,9 @@
 #include "G4AnalysisManager.hh"
 #include "G4SDManager.hh"
 #include "G4HCofThisEvent.hh"
+#include "G4PrimaryVertex.hh"
+#include "G4PrimaryParticle.hh"
+#include "G4ThreeVector.hh"
 
 WaterTankEventAction::WaterTankEventAction(WaterTankRunAction* runAction)
 : G4UserEventAction(),
@@ -42,6 +45,21 @@ void WaterTankEventAction::EndOfEventAction(const G4Event* event)
   auto analysisManager = G4AnalysisManager::Instance();
   const G4int eventId = event->GetEventID();
 
+  // Get primary particle information
+  G4int primaryPDG = 0;
+  G4double primaryEnergy = 0.0;
+  G4ThreeVector primaryPos(0,0,0);
+  G4ThreeVector primaryDir(0,0,0);
+  
+  auto primaryVertex = event->GetPrimaryVertex();
+  if (primaryVertex && primaryVertex->GetNumberOfParticle() > 0) {
+    auto primaryParticle = primaryVertex->GetPrimary();
+    primaryPDG = primaryParticle->GetPDGcode();
+    primaryEnergy = primaryParticle->GetTotalEnergy();
+    primaryPos = primaryVertex->GetPosition();
+    primaryDir = primaryParticle->GetMomentumDirection();
+  }
+
   // Retrieve DOM hits collection and count detections. We cache the collection
   // ID after the first lookup to avoid repeated string-based searches.
   auto hce = event->GetHCofThisEvent();
@@ -57,9 +75,44 @@ void WaterTankEventAction::EndOfEventAction(const G4Event* event)
 
   fDetectionCount = (domHits) ? static_cast<G4int>(domHits->entries()) : 0;
 
+  // Calculate physics analysis variables
+  G4double photonYield = (primaryEnergy > 0) ? fDetectionCount / (primaryEnergy/GeV) : 0.0;
+  G4double firstPhotonTime = 1e9;  // Initialize to large value
+  G4double lastPhotonTime = -1e9;  // Initialize to small value
+  G4double avgWavelength = 0.0;
+  
+  if (domHits && fDetectionCount > 0) {
+    G4double sumWavelength = 0.0;
+    for (G4int ihit = 0; ihit < domHits->entries(); ++ihit) {
+      auto hit = (*domHits)[ihit];
+      if (!hit) continue;
+      G4double hitTime = hit->GetTime();
+      if (hitTime < firstPhotonTime) firstPhotonTime = hitTime;
+      if (hitTime > lastPhotonTime) lastPhotonTime = hitTime;
+      sumWavelength += hit->GetWavelength();
+    }
+    avgWavelength = sumWavelength / fDetectionCount;
+  } else {
+    firstPhotonTime = -1.0;  // No photons detected
+    lastPhotonTime = -1.0;
+  }
+
+  // Fill event ntuple with enhanced data
   analysisManager->FillNtupleIColumn(0, 0, eventId);
   analysisManager->FillNtupleDColumn(0, 1, fEdep/GeV);
   analysisManager->FillNtupleIColumn(0, 2, fDetectionCount);
+  analysisManager->FillNtupleIColumn(0, 3, primaryPDG);
+  analysisManager->FillNtupleDColumn(0, 4, primaryEnergy/GeV);
+  analysisManager->FillNtupleDColumn(0, 5, primaryPos.x()/cm);
+  analysisManager->FillNtupleDColumn(0, 6, primaryPos.y()/cm);
+  analysisManager->FillNtupleDColumn(0, 7, primaryPos.z()/cm);
+  analysisManager->FillNtupleDColumn(0, 8, primaryDir.x());
+  analysisManager->FillNtupleDColumn(0, 9, primaryDir.y());
+  analysisManager->FillNtupleDColumn(0, 10, primaryDir.z());
+  analysisManager->FillNtupleDColumn(0, 11, photonYield);
+  analysisManager->FillNtupleDColumn(0, 12, firstPhotonTime/ns);
+  analysisManager->FillNtupleDColumn(0, 13, lastPhotonTime/ns);
+  analysisManager->FillNtupleDColumn(0, 14, avgWavelength/nm);
   analysisManager->AddNtupleRow(0);
 
   // Populate the hits ntuple with one row per DOM detection. Units are chosen

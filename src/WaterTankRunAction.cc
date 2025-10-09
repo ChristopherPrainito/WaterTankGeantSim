@@ -44,6 +44,20 @@ WaterTankRunAction::WaterTankRunAction()
   analysisManager->CreateNtupleIColumn("EventID");
   analysisManager->CreateNtupleDColumn("Edep_GeV");
   analysisManager->CreateNtupleIColumn("DOMHitCount");
+  // Primary particle information
+  analysisManager->CreateNtupleIColumn("PrimaryPDG");
+  analysisManager->CreateNtupleDColumn("PrimaryEnergy_GeV");
+  analysisManager->CreateNtupleDColumn("PrimaryX_cm");
+  analysisManager->CreateNtupleDColumn("PrimaryY_cm");
+  analysisManager->CreateNtupleDColumn("PrimaryZ_cm");
+  analysisManager->CreateNtupleDColumn("PrimaryDirX");
+  analysisManager->CreateNtupleDColumn("PrimaryDirY");
+  analysisManager->CreateNtupleDColumn("PrimaryDirZ");
+  // Physics analysis variables
+  analysisManager->CreateNtupleDColumn("PhotonYield_per_GeV");
+  analysisManager->CreateNtupleDColumn("FirstPhotonTime_ns");
+  analysisManager->CreateNtupleDColumn("LastPhotonTime_ns");
+  analysisManager->CreateNtupleDColumn("AvgPhotonWavelength_nm");
   analysisManager->FinishNtuple();
 
   // Detailed DOM hit ntuple: one row per detected photon with position,

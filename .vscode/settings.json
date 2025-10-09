@@ -1,0 +1,8 @@
+{
+    "files.associations": {
+        "*.sty": "latex",
+        "*.cls": "latex",
+        "analyze_watertank.C": "cpp",
+        "quick_analysis.C": "cpp"
+    }
+}

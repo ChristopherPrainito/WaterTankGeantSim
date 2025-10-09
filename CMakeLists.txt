@@ -1,5 +1,13 @@
 
 #----------------------------------------------------------------------------
+# Water Tank Geant4 Simulation CMake Configuration
+#
+# This CMakeLists.txt configures the build for a water-Cherenkov detector
+# simulation with CRY cosmic ray library integration for IceCube calibration
+# studies. Requires Geant4 (10.7+) with optical physics and ROOT for analysis.
+#----------------------------------------------------------------------------
+
+#----------------------------------------------------------------------------
 # Setup the project
 cmake_minimum_required(VERSION 3.6 FATAL_ERROR)
 project(WaterTank)
@@ -65,8 +73,8 @@ set(EXAMPLEWaterTank_SCRIPTS
   init_vis.mac
   vis.mac
   cry_setup.file
+  test.mac
   test_cry.mac
-  test_cry_simple.mac
   )
 
 foreach(_script ${EXAMPLEWaterTank_SCRIPTS})
