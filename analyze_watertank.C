@@ -14,6 +14,8 @@
 #include <TLegend.h>
 #include <TStyle.h>
 #include <TMath.h>
+#include <TEllipse.h>
+#include <TF1.h>
 #include <iostream>
 
 void analyze_watertank(const char* filename = "output_default.root") {
@@ -249,49 +251,62 @@ void analyze_watertank(const char* filename = "output_default.root") {
     h_photon_time->SetLineWidth(2);
     
     // 4. DOM hit spatial distribution (X-Y plane)
-    // PURPOSE: 2D map of where photons hit the detector surface
-    // USE: Validates geometric modeling, shows muon track projection effects
+    // PURPOSE: 2D map of where photons hit the spherical DOM surface (R=16.5cm)
+    // USE: Shows muon track projection effects on spherical detector surface
     c2->cd(4);
     gPad->SetGrid(1,1);
     gPad->SetTickx(1);
     gPad->SetTicky(1);
     gPad->SetTopMargin(0.15);
     gPad->SetRightMargin(0.15);
-    TH2F *h_xy_hits = new TH2F("h_xy_hits", "DOM Hit Pattern (Top View)", 30, -150, 150, 30, -150, 150);
+    TH2F *h_xy_hits = new TH2F("h_xy_hits", "DOM Hit Pattern (Top View)", 30, -20, 20, 30, -20, 20);
     h_xy_hits->SetXTitle("X Position [cm]");
     h_xy_hits->SetYTitle("Y Position [cm]");
     h_xy_hits->SetTitleSize(0.032, "XY");
     h_xy_hits->SetLabelSize(0.028, "XY");
     domhitsTree->Draw("PosY_cm:PosX_cm>>h_xy_hits", "", "colz");
     
-    // 5. Cylindrical coordinate view (Z vs R)
-    // PURPOSE: Side view showing height vs radial distance of photon hits
-    // USE: Shows vertical uniformity and radial light propagation patterns
+    // Add circle to show DOM outline
+    TEllipse *domCircle = new TEllipse(0, 0, 16.5, 16.5);
+    domCircle->SetLineColor(kRed);
+    domCircle->SetLineWidth(2);
+    domCircle->SetFillStyle(0);  // hollow
+    domCircle->Draw("same");
+    
+    // 5. Cylindrical coordinate view (Z vs R) - Spherical DOM cross-section
+    // PURPOSE: Side view of spherical DOM detector (R=16.5cm) hit pattern
+    // USE: Shows vertical distribution on spherical detector surface
     c2->cd(5);
     gPad->SetGrid(1,1);
     gPad->SetTickx(1);
     gPad->SetTicky(1);
     gPad->SetTopMargin(0.15);
     gPad->SetRightMargin(0.15);
-    TH2F *h_zr_hits = new TH2F("h_zr_hits", "DOM Hit Pattern (Side View)", 30, -100, 100, 30, 0, 150);
+    TH2F *h_zr_hits = new TH2F("h_zr_hits", "DOM Hit Pattern (Side View)", 30, -20, 20, 30, 0, 20);
     h_zr_hits->SetXTitle("Z Position [cm]");
     h_zr_hits->SetYTitle("Radial Distance R [cm]");
     h_zr_hits->SetTitleSize(0.032, "XY");
     h_zr_hits->SetLabelSize(0.028, "XY");
     domhitsTree->Draw("sqrt(PosX_cm*PosX_cm + PosY_cm*PosY_cm):PosZ_cm>>h_zr_hits", "", "colz");
     
-    // 6. Photon angular distribution
-    // PURPOSE: Direction vectors of photons at detection (related to Cherenkov angle)
-    // USE: Should show clustering around Cherenkov angle (~41° in water)
+    // Add semicircle to show DOM profile (R=16.5cm sphere)
+    TF1 *domProfile = new TF1("domProfile", "sqrt(16.5*16.5 - x*x)", -16.5, 16.5);
+    domProfile->SetLineColor(kRed);
+    domProfile->SetLineWidth(2);
+    domProfile->Draw("same");
+    
+    // 6. Photon angular distribution at spherical DOM surface
+    // PURPOSE: Direction vectors of photons hitting spherical DOM (R=16.5cm)
+    // USE: Shows photon propagation directions when hitting detector surface
     c2->cd(6);
     gPad->SetGrid(1,1);
     gPad->SetTickx(1);
     gPad->SetTicky(1);
     gPad->SetTopMargin(0.15);
     gPad->SetRightMargin(0.15);
-    TH2F *h_photon_dir = new TH2F("h_photon_dir", "Photon Direction at Detection", 36, -180, 180, 18, 0, 180);
-    h_photon_dir->SetXTitle("Azimuthal Angle [degrees]");
-    h_photon_dir->SetYTitle("Polar Angle [degrees]");
+    TH2F *h_photon_dir = new TH2F("h_photon_dir", "Photon Direction at Spherical DOM", 36, -180, 180, 18, 0, 180);
+    h_photon_dir->SetXTitle("Azimuthal Angle #phi [degrees]");
+    h_photon_dir->SetYTitle("Polar Angle #theta [degrees]");
     h_photon_dir->SetTitleSize(0.032, "XY");
     h_photon_dir->SetLabelSize(0.028, "XY");
     domhitsTree->Draw("acos(abs(DirZ))*180/3.14159:atan2(DirY,DirX)*180/3.14159>>h_photon_dir", "", "colz");

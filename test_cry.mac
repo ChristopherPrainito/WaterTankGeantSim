@@ -9,5 +9,5 @@
 # Switch to CRY mode  
 /watertank/generator/useCRY true
 
-# Run 3 events with CRY
-/run/beamOn 100
+# Run 10,000 events with CRY
+/run/beamOn 10000
