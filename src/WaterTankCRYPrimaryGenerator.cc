@@ -159,7 +159,8 @@ void WaterTankCRYPrimaryGenerator::GeneratePrimaryVertex(G4Event* anEvent)
     fParticleGun->SetParticleMomentumDirection(G4ThreeVector(cryParticle->u(), 
                                                              cryParticle->v(), 
                                                              cryParticle->w()));
-    fParticleGun->SetParticleTime(cryParticle->t());
+  // CRY returns time in seconds; convert to Geant4 internal units
+  fParticleGun->SetParticleTime(cryParticle->t() * s);
     
     // Generate primary vertex
     fParticleGun->GeneratePrimaryVertex(anEvent);

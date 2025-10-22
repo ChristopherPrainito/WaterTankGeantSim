@@ -55,7 +55,8 @@ void WaterTankEventAction::EndOfEventAction(const G4Event* event)
   if (primaryVertex && primaryVertex->GetNumberOfParticle() > 0) {
     auto primaryParticle = primaryVertex->GetPrimary();
     primaryPDG = primaryParticle->GetPDGcode();
-    primaryEnergy = primaryParticle->GetTotalEnergy();
+    // Prefer kinetic energy for physics-normalized quantities (exclude rest mass)
+    primaryEnergy = primaryParticle->GetKineticEnergy();
     primaryPos = primaryVertex->GetPosition();
     primaryDir = primaryParticle->GetMomentumDirection();
   }
