@@ -148,12 +148,16 @@ G4bool WaterTankDOMSD::ProcessHits(G4Step* aStep,
 
   fHitsCollection->insert(hit);
 
-  G4cout << "DOM HIT: track=" << track->GetTrackID()
-         << " parent=" << track->GetParentID()
-         << " time=" << postPoint->GetGlobalTime()/ns << " ns"
-         << " energy=" << photonEnergy/eV << " eV"
-         << " wavelength=" << wavelength/nm << " nm"
-         << G4endl;
+  // Reduce console spam: per-photon printing was flooding logs during large
+  // CRY runs. Keep the hit stored for analysis and avoid printing here.
+  // If per-hit debugging is needed, re-enable the print below or add a
+  // verbosity UI command to toggle it.
+  // G4cout << "DOM HIT: track=" << track->GetTrackID()
+  //        << " parent=" << track->GetParentID()
+  //        << " time=" << postPoint->GetGlobalTime()/ns << " ns"
+  //        << " energy=" << photonEnergy/eV << " eV"
+  //        << " wavelength=" << wavelength/nm << " nm"
+  //        << G4endl;
 
   // Terminate the optical photon track once it has triggered the DOM to avoid
   // double-counting or spurious reflections in later optical surfaces.
