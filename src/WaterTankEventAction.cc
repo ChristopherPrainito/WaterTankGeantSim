@@ -16,6 +16,9 @@
 #include "G4PrimaryVertex.hh"
 #include "G4PrimaryParticle.hh"
 #include "G4ThreeVector.hh"
+#include <algorithm>
+#include <vector>
+#include <cmath>
 
 WaterTankEventAction::WaterTankEventAction(WaterTankRunAction* runAction)
 : G4UserEventAction(),
@@ -81,18 +84,44 @@ void WaterTankEventAction::EndOfEventAction(const G4Event* event)
   G4double firstPhotonTime = 1e9;  // Initialize to large value
   G4double lastPhotonTime = -1e9;  // Initialize to small value
   G4double avgWavelength = 0.0;
+  G4double timeRMS = 0.0;
+  G4double timeMedian = 0.0;
   
   if (domHits && fDetectionCount > 0) {
     G4double sumWavelength = 0.0;
+    G4double sumTime = 0.0;
+    G4double sumTime2 = 0.0;
+    std::vector<G4double> hitTimes;
+    hitTimes.reserve(fDetectionCount);
+    
     for (G4int ihit = 0; ihit < domHits->entries(); ++ihit) {
       auto hit = (*domHits)[ihit];
       if (!hit) continue;
       G4double hitTime = hit->GetTime();
+      hitTimes.push_back(hitTime);
+      sumTime += hitTime;
+      sumTime2 += hitTime * hitTime;
       if (hitTime < firstPhotonTime) firstPhotonTime = hitTime;
       if (hitTime > lastPhotonTime) lastPhotonTime = hitTime;
       sumWavelength += hit->GetWavelength();
     }
     avgWavelength = sumWavelength / fDetectionCount;
+    
+    // Compute time statistics
+    G4double meanTime = sumTime / fDetectionCount;
+    G4double variance = (sumTime2 / fDetectionCount) - (meanTime * meanTime);
+    timeRMS = (variance > 0) ? std::sqrt(variance) : 0.0;
+    
+    // Compute median time
+    if (!hitTimes.empty()) {
+      std::sort(hitTimes.begin(), hitTimes.end());
+      size_t n = hitTimes.size();
+      if (n % 2 == 0) {
+        timeMedian = (hitTimes[n/2 - 1] + hitTimes[n/2]) / 2.0;
+      } else {
+        timeMedian = hitTimes[n/2];
+      }
+    }
   } else {
     firstPhotonTime = -1.0;  // No photons detected
     lastPhotonTime = -1.0;
@@ -114,6 +143,8 @@ void WaterTankEventAction::EndOfEventAction(const G4Event* event)
   analysisManager->FillNtupleDColumn(0, 12, firstPhotonTime/ns);
   analysisManager->FillNtupleDColumn(0, 13, lastPhotonTime/ns);
   analysisManager->FillNtupleDColumn(0, 14, avgWavelength/nm);
+  analysisManager->FillNtupleDColumn(0, 15, timeRMS/ns);
+  analysisManager->FillNtupleDColumn(0, 16, timeMedian/ns);
   analysisManager->AddNtupleRow(0);
 
   // Populate the hits ntuple with one row per DOM detection. Units are chosen

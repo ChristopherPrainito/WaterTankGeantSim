@@ -2,6 +2,7 @@
 // Water Tank Analysis ROOT Macro
 // ========================================================
 // Comprehensive analysis and plotting of water tank simulation data
+// for IceCube DOM calibration studies with Cherenkov light detection
 // Run with: root -l analyze_watertank.C
 // Or from ROOT prompt: .x analyze_watertank.C
 
@@ -16,7 +17,43 @@
 #include <TMath.h>
 #include <TEllipse.h>
 #include <TF1.h>
+#include <TLine.h>
+#include <TLatex.h>
 #include <iostream>
+#include <vector>
+#include <cmath>
+
+// Physical constants
+const double c_light = 29.9792458; // cm/ns (speed of light)
+const double DOM_RADIUS = 16.5;    // cm
+
+// Refractive index of water as function of wavelength (nm)
+// Interpolated from simulation values
+double getRefractiveIndex(double wavelength_nm) {
+    // Data points from simulation: (wavelength nm, n)
+    // 620nm->1.333, 500nm->1.334, 400nm->1.336, 350nm->1.338, 320nm->1.340, 300nm->1.342
+    if (wavelength_nm >= 620) return 1.333;
+    if (wavelength_nm <= 300) return 1.342;
+    
+    // Linear interpolation
+    double wl[] = {300, 320, 350, 400, 500, 620};
+    double n[]  = {1.342, 1.340, 1.338, 1.336, 1.334, 1.333};
+    
+    for (int i = 0; i < 5; i++) {
+        if (wavelength_nm >= wl[i] && wavelength_nm <= wl[i+1]) {
+            double frac = (wavelength_nm - wl[i]) / (wl[i+1] - wl[i]);
+            return n[i] + frac * (n[i+1] - n[i]);
+        }
+    }
+    return 1.337; // fallback average
+}
+
+// Expected Cherenkov angle for beta~1 particle
+double getCherenkovAngle(double n) {
+    // cos(theta_c) = 1/(beta*n), for beta~1: theta_c = acos(1/n)
+    if (n <= 1.0) return 0;
+    return TMath::ACos(1.0/n) * 180.0 / TMath::Pi(); // degrees
+}
 
 void analyze_watertank(const char* filename = "output_default.root") {
     
@@ -184,6 +221,55 @@ void analyze_watertank(const char* filename = "output_default.root") {
     c1->Print("water_tank_event_analysis.png");
     
     // ========================================================
+    // Extended Event Analysis with Timing Statistics
+    // PURPOSE: Validate timing distribution and scattering effects
+    // ========================================================
+    
+    TCanvas *c1b = new TCanvas("c1b", "Extended Timing Analysis", 1400, 500);
+    c1b->Divide(3, 1);
+    c1b->SetBorderMode(0);
+    
+    // 1. Time RMS distribution - measures scattering effects
+    c1b->cd(1);
+    gPad->SetGrid(1,1);
+    gPad->SetTopMargin(0.15);
+    TH1F *h_time_rms = new TH1F("h_time_rms", "Photon Arrival Time Spread (RMS)", 50, 0, 20);
+    h_time_rms->SetXTitle("Time RMS [ns]");
+    h_time_rms->SetYTitle("Number of Events");
+    eventTree->Draw("TimeRMS_ns>>h_time_rms", "TimeRMS_ns>0", "");
+    h_time_rms->SetFillColor(kCyan-3);
+    h_time_rms->SetLineColor(kCyan+2);
+    h_time_rms->SetLineWidth(2);
+    
+    // 2. Time median distribution
+    c1b->cd(2);
+    gPad->SetGrid(1,1);
+    gPad->SetTopMargin(0.15);
+    TH1F *h_time_median = new TH1F("h_time_median", "Median Photon Arrival Time", 50, 0, 50);
+    h_time_median->SetXTitle("Median Time [ns]");
+    h_time_median->SetYTitle("Number of Events");
+    eventTree->Draw("TimeMedian_ns>>h_time_median", "TimeMedian_ns>0", "");
+    h_time_median->SetFillColor(kTeal-3);
+    h_time_median->SetLineColor(kTeal+2);
+    h_time_median->SetLineWidth(2);
+    
+    // 3. Time spread (last - first) distribution
+    c1b->cd(3);
+    gPad->SetGrid(1,1);
+    gPad->SetTopMargin(0.15);
+    TH1F *h_time_spread = new TH1F("h_time_spread", "Photon Time Window (Last - First)", 50, 0, 100);
+    h_time_spread->SetXTitle("Time Window [ns]");
+    h_time_spread->SetYTitle("Number of Events");
+    eventTree->Draw("(LastPhotonTime_ns-FirstPhotonTime_ns)>>h_time_spread", 
+                    "FirstPhotonTime_ns>0 && LastPhotonTime_ns>0", "");
+    h_time_spread->SetFillColor(kPink-3);
+    h_time_spread->SetLineColor(kPink+2);
+    h_time_spread->SetLineWidth(2);
+    
+    c1b->Update();
+    c1b->Print("water_tank_timing_analysis.png");
+    
+    // ========================================================
     // DOM Hit Analysis (individual photons)
     // PURPOSE: Analyze individual Cherenkov photon properties and detector response
     // These plots validate optical physics, PMT performance, and geometric reconstruction
@@ -315,6 +401,153 @@ void analyze_watertank(const char* filename = "output_default.root") {
     c2->Print("water_tank_photon_analysis.png");
     
     // ========================================================
+    // Cherenkov Physics Validation
+    // PURPOSE: Validate fundamental Cherenkov radiation physics
+    // These plots compare simulation output to theoretical predictions
+    // ========================================================
+    
+    TCanvas *c2b = new TCanvas("c2b", "Cherenkov Physics Validation", 1400, 900);
+    c2b->Divide(3, 2);
+    c2b->SetBorderMode(0);
+    
+    // 1. Cherenkov angle validation using photon directions at DOM surface
+    // For a spherical DOM, we compute angle between photon direction and 
+    // radial vector from DOM center to hit position
+    c2b->cd(1);
+    gPad->SetGrid(1,1);
+    gPad->SetTopMargin(0.15);
+    TH1F *h_cherenkov_angle = new TH1F("h_cherenkov_angle", 
+        "Photon Incidence Angle at DOM Surface", 90, 0, 90);
+    h_cherenkov_angle->SetXTitle("Incidence Angle [degrees]");
+    h_cherenkov_angle->SetYTitle("Number of Photons");
+    // Angle between photon direction and inward radial direction
+    // radial = -pos/|pos|, so angle = acos(-dir . pos/|pos|)
+    domhitsTree->Draw("acos(-(DirX*PosX_cm + DirY*PosY_cm + DirZ*PosZ_cm)/sqrt(PosX_cm*PosX_cm + PosY_cm*PosY_cm + PosZ_cm*PosZ_cm))*180/3.14159>>h_cherenkov_angle", "", "");
+    h_cherenkov_angle->SetFillColor(kAzure-3);
+    h_cherenkov_angle->SetLineColor(kAzure+2);
+    h_cherenkov_angle->SetLineWidth(2);
+    
+    // Draw expected Cherenkov angle line for water (n~1.337 at 400nm)
+    double expected_angle = getCherenkovAngle(1.337);
+    TLine *cherenkov_line = new TLine(expected_angle, 0, expected_angle, h_cherenkov_angle->GetMaximum()*0.8);
+    cherenkov_line->SetLineColor(kRed);
+    cherenkov_line->SetLineWidth(2);
+    cherenkov_line->SetLineStyle(2);
+    cherenkov_line->Draw("same");
+    
+    TLatex *lat1 = new TLatex(expected_angle+2, h_cherenkov_angle->GetMaximum()*0.7, 
+                              Form("#theta_{C} = %.1f#circ (n=1.337)", expected_angle));
+    lat1->SetTextColor(kRed);
+    lat1->SetTextSize(0.035);
+    lat1->Draw();
+    
+    // 2. Wavelength spectrum compared to theoretical 1/lambda^2
+    c2b->cd(2);
+    gPad->SetGrid(1,1);
+    gPad->SetTopMargin(0.15);
+    TH1F *h_wl_theory = new TH1F("h_wl_theory", 
+        "Cherenkov Spectrum: Data vs Theory (1/#lambda^{2})", 40, 300, 700);
+    h_wl_theory->SetXTitle("Wavelength [nm]");
+    h_wl_theory->SetYTitle("Relative Intensity");
+    domhitsTree->Draw("Wavelength_nm>>h_wl_theory", "", "");
+    h_wl_theory->SetLineColor(kBlue);
+    h_wl_theory->SetLineWidth(2);
+    h_wl_theory->SetFillStyle(0);
+    
+    // Overlay theoretical 1/lambda^2 curve (normalized to data)
+    TF1 *f_theory = new TF1("f_theory", "[0]/(x*x)", 300, 700);
+    // Normalize to match histogram integral
+    double data_integral = h_wl_theory->Integral();
+    double theory_norm = data_integral * 400 * 400 / 40; // approximate normalization
+    f_theory->SetParameter(0, theory_norm);
+    f_theory->SetLineColor(kRed);
+    f_theory->SetLineWidth(2);
+    f_theory->SetLineStyle(2);
+    f_theory->Draw("same");
+    
+    TLegend *leg2 = new TLegend(0.5, 0.7, 0.88, 0.85);
+    leg2->AddEntry(h_wl_theory, "Simulated spectrum", "l");
+    leg2->AddEntry(f_theory, "Theory: 1/#lambda^{2}", "l");
+    leg2->SetBorderSize(0);
+    leg2->Draw();
+    
+    // 3. Detected spectrum weighted by QE
+    // QE curve from simulation: peaks around 350-400nm
+    c2b->cd(3);
+    gPad->SetGrid(1,1);
+    gPad->SetTopMargin(0.15);
+    TH1F *h_detected_wl = new TH1F("h_detected_wl", 
+        "Detected Wavelength (includes QE weighting)", 40, 300, 700);
+    h_detected_wl->SetXTitle("Wavelength [nm]");
+    h_detected_wl->SetYTitle("Detected Photons");
+    domhitsTree->Draw("Wavelength_nm>>h_detected_wl", "", "");
+    h_detected_wl->SetFillColor(kGreen-3);
+    h_detected_wl->SetLineColor(kGreen+2);
+    h_detected_wl->SetLineWidth(2);
+    
+    // Mark peak sensitivity region
+    TLine *qe_lo = new TLine(350, 0, 350, h_detected_wl->GetMaximum()*0.9);
+    TLine *qe_hi = new TLine(450, 0, 450, h_detected_wl->GetMaximum()*0.9);
+    qe_lo->SetLineColor(kMagenta);
+    qe_hi->SetLineColor(kMagenta);
+    qe_lo->SetLineStyle(2);
+    qe_hi->SetLineStyle(2);
+    qe_lo->Draw("same");
+    qe_hi->Draw("same");
+    
+    TLatex *lat2 = new TLatex(360, h_detected_wl->GetMaximum()*0.95, "Peak QE region");
+    lat2->SetTextColor(kMagenta);
+    lat2->SetTextSize(0.03);
+    lat2->Draw();
+    
+    // 4. Time residuals: observed time vs expected direct path time
+    c2b->cd(4);
+    gPad->SetGrid(1,1);
+    gPad->SetTopMargin(0.15);
+    TH1F *h_time_residual = new TH1F("h_time_residual", 
+        "Time Residual (observed - expected direct path)", 100, -10, 50);
+    h_time_residual->SetXTitle("Time Residual [ns]");
+    h_time_residual->SetYTitle("Number of Photons");
+    // Expected time = n * distance / c, distance ~ DOM_RADIUS for surface hits
+    // This is simplified; full calculation would need track geometry
+    double n_water = 1.337;
+    double expected_time_offset = n_water * DOM_RADIUS / c_light;
+    domhitsTree->Draw(Form("Time_ns - %f>>h_time_residual", expected_time_offset), "Time_ns>0", "");
+    h_time_residual->SetFillColor(kOrange-3);
+    h_time_residual->SetLineColor(kOrange+2);
+    h_time_residual->SetLineWidth(2);
+    
+    // 5. Photon yield vs estimated track length through tank
+    // Track length estimate: for vertical muon through center, ~2*tank_half_height
+    c2b->cd(5);
+    gPad->SetGrid(1,1);
+    gPad->SetTopMargin(0.15);
+    gPad->SetRightMargin(0.15);
+    TH2F *h_yield_vs_edep = new TH2F("h_yield_vs_edep", 
+        "Photon Yield vs Energy Deposition (track length proxy)", 
+        25, 0, 0.5, 25, 0, 2000);
+    h_yield_vs_edep->SetXTitle("Energy Deposited [GeV]");
+    h_yield_vs_edep->SetYTitle("Detected Photons");
+    eventTree->Draw("DOMHitCount:Edep_GeV>>h_yield_vs_edep", "DOMHitCount>0 && Edep_GeV>0", "colz");
+    
+    // 6. Angular acceptance: hit rate vs theta (polar angle on DOM)
+    c2b->cd(6);
+    gPad->SetGrid(1,1);
+    gPad->SetTopMargin(0.15);
+    TH1F *h_dom_theta = new TH1F("h_dom_theta", 
+        "DOM Hit Distribution vs Polar Angle (from +Z)", 36, 0, 180);
+    h_dom_theta->SetXTitle("Polar Angle #theta [degrees]");
+    h_dom_theta->SetYTitle("Number of Photons");
+    // theta = acos(z/r) where r = DOM_RADIUS
+    domhitsTree->Draw(Form("acos(PosZ_cm/%f)*180/3.14159>>h_dom_theta", DOM_RADIUS), "", "");
+    h_dom_theta->SetFillColor(kViolet-3);
+    h_dom_theta->SetLineColor(kViolet+2);
+    h_dom_theta->SetLineWidth(2);
+    
+    c2b->Update();
+    c2b->Print("water_tank_cherenkov_validation.png");
+    
+    // ========================================================
     // Physics Analysis and Performance Metrics
     // PURPOSE: Fundamental physics validation and detector performance assessment
     // These plots validate theoretical predictions and assess detector design
@@ -403,6 +636,7 @@ void analyze_watertank(const char* filename = "output_default.root") {
     // ========================================================
     std::cout << "\n=======================================" << std::endl;
     std::cout << "    WATER TANK ANALYSIS SUMMARY" << std::endl;
+    std::cout << "    IceCube DOM Cherenkov Calibration" << std::endl;
     std::cout << "=======================================" << std::endl;
     std::cout << "Total events analyzed: " << eventTree->GetEntries() << std::endl;
     std::cout << "Total photon hits: " << domhitsTree->GetEntries() << std::endl;
@@ -415,20 +649,40 @@ void analyze_watertank(const char* filename = "output_default.root") {
         eventTree->Draw("PrimaryEnergy_GeV", "", "goff");
         TH1F *htemp = (TH1F*)gDirectory->Get("htemp");
         if (htemp) {
-            std::cout << "Average muon energy: " << htemp->GetMean() << " ± " << htemp->GetRMS() << " GeV" << std::endl;
+            std::cout << "Average muon energy: " << htemp->GetMean() << " +/- " << htemp->GetRMS() << " GeV" << std::endl;
         }
         
         eventTree->Draw("DOMHitCount", "DOMHitCount>0", "goff");
         htemp = (TH1F*)gDirectory->Get("htemp");
         if (htemp) {
-            std::cout << "Average hit multiplicity: " << htemp->GetMean() << " ± " << htemp->GetRMS() << " photons" << std::endl;
+            std::cout << "Average hit multiplicity: " << htemp->GetMean() << " +/- " << htemp->GetRMS() << " photons" << std::endl;
+        }
+        
+        eventTree->Draw("TimeRMS_ns", "TimeRMS_ns>0", "goff");
+        htemp = (TH1F*)gDirectory->Get("htemp");
+        if (htemp) {
+            std::cout << "Average time spread (RMS): " << htemp->GetMean() << " +/- " << htemp->GetRMS() << " ns" << std::endl;
+        }
+        
+        eventTree->Draw("AvgPhotonWavelength_nm", "AvgPhotonWavelength_nm>0", "goff");
+        htemp = (TH1F*)gDirectory->Get("htemp");
+        if (htemp) {
+            std::cout << "Average detected wavelength: " << htemp->GetMean() << " +/- " << htemp->GetRMS() << " nm" << std::endl;
         }
     }
     
+    // Physics validation summary
+    std::cout << "\n--- Physics Validation ---" << std::endl;
+    std::cout << "Expected Cherenkov angle (n=1.337): " << getCherenkovAngle(1.337) << " degrees" << std::endl;
+    std::cout << "Speed of light in water: " << c_light/1.337 << " cm/ns" << std::endl;
+    std::cout << "DOM radius: " << DOM_RADIUS << " cm" << std::endl;
+    
     std::cout << "\nGenerated analysis plots:" << std::endl;
-    std::cout << "- water_tank_event_analysis.png (6 event-level plots)" << std::endl;
-    std::cout << "- water_tank_photon_analysis.png (6 photon-level plots)" << std::endl;
-    std::cout << "- water_tank_physics_analysis.png (2 physics validation plots)" << std::endl;
+    std::cout << "- water_tank_event_analysis.png    (6 event-level plots)" << std::endl;
+    std::cout << "- water_tank_timing_analysis.png   (3 timing statistics plots)" << std::endl;
+    std::cout << "- water_tank_photon_analysis.png   (6 photon-level plots)" << std::endl;
+    std::cout << "- water_tank_cherenkov_validation.png (6 physics validation plots)" << std::endl;
+    std::cout << "- water_tank_physics_analysis.png  (2 performance plots)" << std::endl;
     std::cout << "=======================================" << std::endl;
     
     // Close file

@@ -11,13 +11,16 @@ class WaterTankPrimaryGeneratorAction;
 class G4UIdirectory;
 class G4UIcmdWithABool;
 class G4UIcmdWithAString;
+class G4UIcmdWithADoubleAndUnit;
+class G4UIcmdWith3Vector;
+class G4UIcmdWith3VectorAndUnit;
 
 /// Messenger class for WaterTankPrimaryGeneratorAction
 ///
 /// This class provides UI commands to control the primary generator:
 /// - Switch between single muon and CRY cosmic ray shower modes
 /// - Set CRY setup file path
-/// - Configure generator parameters
+/// - Configure single muon parameters (energy, direction, position)
 
 class WaterTankPrimaryGeneratorMessenger : public G4UImessenger
 {
@@ -32,9 +35,15 @@ class WaterTankPrimaryGeneratorMessenger : public G4UImessenger
     
     G4UIdirectory* fWaterTankDirectory;
     G4UIdirectory* fGeneratorDirectory;
+    G4UIdirectory* fMuonDirectory;
     
     G4UIcmdWithABool* fUseCRYCmd;
     G4UIcmdWithAString* fCRYSetupFileCmd;
+    
+    // Single muon configuration commands
+    G4UIcmdWithADoubleAndUnit* fMuonEnergyCmd;
+    G4UIcmdWith3Vector* fMuonDirectionCmd;
+    G4UIcmdWith3VectorAndUnit* fMuonPositionCmd;
 };
 
 #endif

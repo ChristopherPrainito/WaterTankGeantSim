@@ -77,8 +77,37 @@ G4bool WaterTankDOMSD::ProcessHits(G4Step* aStep,
     return false;
   }
 
-  // Require photon to move from water into the DOM
-  if (preVolume != fWaterPhysicalVolume || postVolume != fDOMPhysicalVolume) {
+  // For dielectric_metal surface, the photon is absorbed at the boundary
+  // while still "in" the water volume. Check if we're at a geometry boundary
+  // with water as preVolume. The postVolume might still be water if the 
+  // photon is absorbed/reflected at the surface.
+  
+  // First check: is this a boundary step from water?
+  if (preVolume != fWaterPhysicalVolume) {
+    return false;
+  }
+  
+  if (postPoint->GetStepStatus() != fGeomBoundary) {
+    return false;
+  }
+  
+  // Check if postVolume is DOM, OR if we're at water boundary with DOM
+  // For dielectric_metal, the photon may be absorbed without "entering" DOM
+  bool enteringDOM = (postVolume == fDOMPhysicalVolume);
+  
+  // Also check if we're at the water-DOM boundary by position
+  // The DOM is a sphere of radius 16.5cm at origin
+  if (!enteringDOM) {
+    G4ThreeVector pos = postPoint->GetPosition();
+    G4double r = pos.mag();
+    G4double domRadius = 16.5 * cm;  // From detector construction
+    // If we're at ~DOM radius and step status is boundary, we're hitting DOM
+    if (std::abs(r - domRadius) < 1.0*mm) {
+      enteringDOM = true;
+    }
+  }
+  
+  if (!enteringDOM) {
     return false;
   }
 

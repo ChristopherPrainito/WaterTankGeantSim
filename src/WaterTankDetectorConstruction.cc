@@ -93,12 +93,26 @@ G4VPhysicalVolume* WaterTankDetectorConstruction::Construct()
      70.*m
   };
 
+  // Rayleigh scattering lengths in pure water (wavelength-dependent).
+  // Rayleigh scattering scales as 1/lambda^4; shorter wavelengths scatter more.
+  // Values are approximate for ultrapure water at these energies.
+  G4double rayleighWater[nOptPhotons] =
+  {
+    300.*m,   // 620 nm - long wavelengths scatter less
+    150.*m,   // 500 nm
+     60.*m,   // 400 nm
+     30.*m,   // 350 nm
+     18.*m,   // 320 nm
+     12.*m    // 300 nm - short wavelengths scatter more
+  };
+
   // Attach wavelength-dependent optical constants so Cherenkov photons are
-  // refracted/absorbed realistically. Geant4 interpolates between these
+  // refracted/absorbed/scattered realistically. Geant4 interpolates between these
   // sample points when propagating optical photons.
   auto waterMPT = new G4MaterialPropertiesTable();
   waterMPT->AddProperty("RINDEX", photonEnergy, refractiveIndexWater, nOptPhotons);
   waterMPT->AddProperty("ABSLENGTH", photonEnergy, absorptionWater, nOptPhotons);
+  waterMPT->AddProperty("RAYLEIGH", photonEnergy, rayleighWater, nOptPhotons);
   matWater->SetMaterialPropertiesTable(waterMPT);
 
   // --------------------------------------------------------------
@@ -282,7 +296,10 @@ void WaterTankDetectorConstruction::ConstructSDandField()
   domSD->SetDOMOpticalSurfaceName("DOMOpticalSurfaceBorder");
   G4SDManager::GetSDMpointer()->AddNewDetector(domSD);
   
-  // Attach sensitive detector to DOM logical volume
+  // Attach sensitive detector to both DOM and water logical volumes.
+  // The SD needs to be on the water volume to catch optical photons as they
+  // cross from water into the DOM boundary. The SD logic filters for only
+  // boundary-crossing optical photons from water→DOM.
   if (fDOMLogicalVolume) {
     SetSensitiveDetector(fDOMLogicalVolume, domSD);
   }

@@ -11,8 +11,12 @@
 /run/printProgress 5
 
 # Configure single muon generator (default mode)
-# Default: 4 GeV muon along -Z direction from above tank
+# Muon offset from center so Cherenkov cone illuminates DOM sphere
+# (A muon going straight through center produces a cone that mostly misses the DOM)
 /watertank/generator/useCRY false
+/watertank/generator/muon/energy 4 GeV
+/watertank/generator/muon/direction 0 0 -1
+/watertank/generator/muon/position 30 0 200 cm
 
 # Run 10 single muon events for basic testing
 /run/beamOn 10

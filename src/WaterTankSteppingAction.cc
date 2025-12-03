@@ -47,8 +47,5 @@ void WaterTankSteppingAction::UserSteppingAction(const G4Step* step)
   // Feed the energy deposit to the event action which will forward it to the
   // run action at the end of the event. This supports both ST and MT modes.
   G4double edepStep = step->GetTotalEnergyDeposit();
-  fEventAction->AddEdep(edepStep);  
-
-  G4ThreeVector endPoint = step->GetPostStepPoint()->GetPosition();
-  //fEventAction->FillHistograms(edepStep, endPoint.getZ(), endPoint.getX(), endPoint.getY());
+  fEventAction->AddEdep(edepStep);
 }

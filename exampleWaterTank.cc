@@ -60,8 +60,11 @@ int main(int argc,char** argv)
   opticalParameters->SetWLSTimeProfile("delta");
   opticalParameters->SetCerenkovStackPhotons(true);
   opticalParameters->SetCerenkovTrackSecondariesFirst(true);
+  // Limit photons per step for performance; increase if photon yield looks low.
   opticalParameters->SetCerenkovMaxPhotonsPerStep(300);
-  opticalParameters->SetCerenkovMaxBetaChange(10.0);
+  // Small MaxBetaChange ensures fine sampling of Cherenkov production along track.
+  // Values ~0.05-0.1 are realistic; 10.0 was far too coarse and under-sampled yield.
+  opticalParameters->SetCerenkovMaxBetaChange(0.05);
 
   runManager->SetUserInitialization(physicsList);
     

@@ -58,6 +58,9 @@ WaterTankRunAction::WaterTankRunAction()
   analysisManager->CreateNtupleDColumn("FirstPhotonTime_ns");
   analysisManager->CreateNtupleDColumn("LastPhotonTime_ns");
   analysisManager->CreateNtupleDColumn("AvgPhotonWavelength_nm");
+  // Extended timing statistics for physics validation
+  analysisManager->CreateNtupleDColumn("TimeRMS_ns");
+  analysisManager->CreateNtupleDColumn("TimeMedian_ns");
   analysisManager->FinishNtuple();
 
   // Detailed DOM hit ntuple: one row per detected photon with position,
@@ -93,66 +96,15 @@ void WaterTankRunAction::BeginOfRunAction(const G4Run*)
   // Get analysis manager
   auto analysisManager = G4AnalysisManager::Instance();
   
-  const WaterTankDetectorConstruction* detectorConstruction
-      = static_cast<const WaterTankDetectorConstruction*>
-        (G4RunManager::GetRunManager()->GetUserDetectorConstruction());
-  G4LogicalVolume* scoringVolume = detectorConstruction->GetScoringVolume();
-  G4String material = scoringVolume->GetMaterial()->GetName();
-  G4cout << "RADIATION LENGTH: " << scoringVolume->GetMaterial()->GetRadlen() << G4endl;
+  // Access detector construction for geometry info if needed.
+  // (Previously printed radiation length which was calorimetry-specific.)
 
   // Write output to a deterministic filename unless changed via macro. ROOT
   // will append a thread suffix automatically when ntuple merging is disabled.
   G4String fileName = "output_default.root";
   analysisManager->OpenFile(fileName);
 
-  //if (!IsMaster()) {
-  //  const WaterTankPrimaryGeneratorAction* generatorAction =
-  //      static_cast<const WaterTankPrimaryGeneratorAction*>(
-  //          G4RunManager::GetRunManager()->GetUserPrimaryGeneratorAction());
 
-  //  if (generatorAction) {
-  //    const G4ParticleGun* particleGun = generatorAction->GetParticleGun();
-  //    G4String name = particleGun->GetParticleDefinition()->GetParticleName();
-  //    G4double energy = particleGun->GetParticleEnergy();
-  //    fileName = "ntuple_" + name + "_" + std::to_string((int)energy) + ".root";
-  //  }
-
-
-  //  //// Creating histograms
-  //  //analysisManager->CreateNtuple("showerEDep", "Energy Deposition in Volume");
-  //  //analysisManager->CreateNtupleDColumn("E");
-  //  //analysisManager->CreateNtupleDColumn("z");
-  //  //analysisManager->CreateNtupleDColumn("r");
-  //  //analysisManager->CreateNtupleDColumn("x");
-  //  //analysisManager->CreateNtupleDColumn("y");
-  //  //m_segment = 0.050*m;
-  //  //m_segment = 0.025*m;
-  //  //G4float offset = m_segment / 2;
-  //  //G4int nSegments = 1.9*m / m_segment;
-  //  //G4int histo2= analysisManager->CreateH2("EdepKTeV", "",
-  //  //      nSegments, -0.95*m-offset, 0.95*m-offset,
-  //  //      nSegments, -0.95*m-offset, 0.95*m-offset); // This doesn't appear to be filled?
-  //  //analysisManager->SetH2Activation(histo2, true);
-  //  //analysisManager->FinishNtuple();
-  //}
-  // Creating histograms
-  //analysisManager->OpenFile(fileName);
-  //analysisManager->CreateNtuple("showerEDep", "Energy Deposition in Volume");
-  //analysisManager->CreateNtupleDColumn("E");
-  //analysisManager->CreateNtupleDColumn("z");
-  //analysisManager->CreateNtupleDColumn("r");
-  //analysisManager->CreateNtupleDColumn("x");
-  //analysisManager->CreateNtupleDColumn("y");
-  //std::cout << "here1" << std::endl;
-  //m_segment = 0.050*m;
-  //m_segment = 0.025*m;
-  //G4float offset = m_segment / 2;
-  //G4int nSegments = 1.9*m / m_segment;
-  //G4int histo2= analysisManager->CreateH2("EdepKTeV", "",
-  //      nSegments, -0.95*m-offset, 0.95*m-offset,
-  //      nSegments, -0.95*m-offset, 0.95*m-offset); // This doesn't appear to be filled?
-  //analysisManager->SetH2Activation(histo2, true);
-  //analysisManager->FinishNtuple();
 
   // reset accumulables to their initial values
   G4AccumulableManager* accumulableManager = G4AccumulableManager::Instance();

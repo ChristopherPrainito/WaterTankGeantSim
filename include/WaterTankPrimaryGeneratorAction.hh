@@ -6,6 +6,7 @@
 
 #include "G4VUserPrimaryGeneratorAction.hh"
 #include "G4ParticleGun.hh"
+#include "G4ThreeVector.hh"
 #include "globals.hh"
 
 class G4ParticleGun;
@@ -17,12 +18,13 @@ class WaterTankPrimaryGeneratorMessenger;
 /// Configures the primary particle gun that seeds each event.
 ///
 /// This class supports two modes:
-/// 1. Single muon mode: launches a single down-going 4 GeV muon from just
-///    outside the world boundary and aims it straight through the tank.
+/// 1. Single muon mode: launches a configurable muon from a specified
+///    position and direction through the tank.
 /// 2. CRY mode: uses the CRY cosmic ray shower library to generate realistic
 ///    cosmic ray showers at sea level for Cambridge, MA conditions.
 ///
 /// The mode can be switched using SetUseCRY() method or via macro commands.
+/// Single muon parameters can be configured via /watertank/generator/muon/* commands.
 
 enum class GeneratorMode {
   SingleMuon,
@@ -43,6 +45,11 @@ class WaterTankPrimaryGeneratorAction : public G4VUserPrimaryGeneratorAction
     void SetCRYSetupFile(const G4String& filename);
     G4bool GetUseCRY() const { return fMode == GeneratorMode::CRYShower; }
     
+    // Single muon configuration
+    void SetMuonEnergy(G4double energy);
+    void SetMuonDirection(const G4ThreeVector& dir);
+    void SetMuonPosition(const G4ThreeVector& pos);
+    
     // method to access particle gun
     const G4ParticleGun* GetParticleGun() const { return fParticleGun; }
   
@@ -53,6 +60,12 @@ class WaterTankPrimaryGeneratorAction : public G4VUserPrimaryGeneratorAction
     /// Single muon mode components
     G4ParticleGun* fParticleGun; ///< Particle gun for single muon mode
     G4Box* fEnvelopeBox; ///< Cached world box for positioning
+    
+    /// Single muon configuration (user-settable)
+    G4double fMuonEnergy;         ///< Muon kinetic energy
+    G4ThreeVector fMuonDirection; ///< Muon momentum direction
+    G4ThreeVector fMuonPosition;  ///< Muon starting position
+    G4bool fUseCustomPosition;    ///< Whether to use custom position vs auto
     
     /// CRY mode components  
     WaterTankCRYPrimaryGenerator* fCRYGenerator; ///< CRY cosmic ray generator

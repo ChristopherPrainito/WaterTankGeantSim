@@ -29,3 +29,4 @@ Makefile
 
 # ROOT output files
 *.root
+.github/copilot-instructions.md
