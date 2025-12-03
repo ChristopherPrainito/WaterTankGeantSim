@@ -40,32 +40,49 @@ WaterTankRunAction::WaterTankRunAction()
 
   // Event-level summary ntuple: one row per event capturing how much energy
   // was deposited in the water and how many DOM hits were recorded.
+  // Ntuple 0: event
   analysisManager->CreateNtuple("event", "Event summary");
-  analysisManager->CreateNtupleIColumn("EventID");
-  analysisManager->CreateNtupleDColumn("Edep_GeV");
-  analysisManager->CreateNtupleIColumn("DOMHitCount");
+  analysisManager->CreateNtupleIColumn("EventID");           // 0
+  analysisManager->CreateNtupleDColumn("Edep_GeV");          // 1
+  analysisManager->CreateNtupleIColumn("DOMHitCount");       // 2
   // Primary particle information
-  analysisManager->CreateNtupleIColumn("PrimaryPDG");
-  analysisManager->CreateNtupleDColumn("PrimaryEnergy_GeV");
-  analysisManager->CreateNtupleDColumn("PrimaryX_cm");
-  analysisManager->CreateNtupleDColumn("PrimaryY_cm");
-  analysisManager->CreateNtupleDColumn("PrimaryZ_cm");
-  analysisManager->CreateNtupleDColumn("PrimaryDirX");
-  analysisManager->CreateNtupleDColumn("PrimaryDirY");
-  analysisManager->CreateNtupleDColumn("PrimaryDirZ");
+  analysisManager->CreateNtupleIColumn("PrimaryPDG");        // 3
+  analysisManager->CreateNtupleDColumn("PrimaryEnergy_GeV"); // 4
+  analysisManager->CreateNtupleDColumn("PrimaryX_cm");       // 5
+  analysisManager->CreateNtupleDColumn("PrimaryY_cm");       // 6
+  analysisManager->CreateNtupleDColumn("PrimaryZ_cm");       // 7
+  analysisManager->CreateNtupleDColumn("PrimaryDirX");       // 8
+  analysisManager->CreateNtupleDColumn("PrimaryDirY");       // 9
+  analysisManager->CreateNtupleDColumn("PrimaryDirZ");       // 10
   // Physics analysis variables
-  analysisManager->CreateNtupleDColumn("PhotonYield_per_GeV");
-  analysisManager->CreateNtupleDColumn("FirstPhotonTime_ns");
-  analysisManager->CreateNtupleDColumn("LastPhotonTime_ns");
-  analysisManager->CreateNtupleDColumn("AvgPhotonWavelength_nm");
+  analysisManager->CreateNtupleDColumn("PhotonYield_per_GeV"); // 11
+  analysisManager->CreateNtupleDColumn("FirstPhotonTime_ns");  // 12
+  analysisManager->CreateNtupleDColumn("LastPhotonTime_ns");   // 13
+  analysisManager->CreateNtupleDColumn("AvgPhotonWavelength_nm"); // 14
   // Extended timing statistics for physics validation
-  analysisManager->CreateNtupleDColumn("TimeRMS_ns");
-  analysisManager->CreateNtupleDColumn("TimeMedian_ns");
+  analysisManager->CreateNtupleDColumn("TimeRMS_ns");        // 15
+  analysisManager->CreateNtupleDColumn("TimeMedian_ns");     // 16
+  // Scintillator trigger information
+  analysisManager->CreateNtupleIColumn("ScintHitCount");     // 17
+  analysisManager->CreateNtupleIColumn("ScintL0HitCount");   // 18
+  analysisManager->CreateNtupleIColumn("ScintL1HitCount");   // 19
+  analysisManager->CreateNtupleDColumn("ScintFirstTime_ns"); // 20
+  analysisManager->CreateNtupleDColumn("ScintL0FirstTime_ns"); // 21
+  analysisManager->CreateNtupleDColumn("ScintL1FirstTime_ns"); // 22
+  analysisManager->CreateNtupleIColumn("ScintL0FirstBar");   // 23
+  analysisManager->CreateNtupleIColumn("ScintL1FirstBar");   // 24
+  analysisManager->CreateNtupleDColumn("ScintTotalEdep_MeV"); // 25
+  // Time-of-flight from scintillator to DOM
+  analysisManager->CreateNtupleDColumn("TOF_ns");            // 26 (FirstPhotonTime - ScintFirstTime)
+  analysisManager->CreateNtupleDColumn("TOF_L0_ns");         // 27 (FirstPhotonTime - ScintL0FirstTime)
+  analysisManager->CreateNtupleDColumn("TOF_L1_ns");         // 28 (FirstPhotonTime - ScintL1FirstTime)
+  analysisManager->CreateNtupleIColumn("ScintCoincidence");  // 29 (1 if both layers hit, 0 otherwise)
   analysisManager->FinishNtuple();
 
   // Detailed DOM hit ntuple: one row per detected photon with position,
   // direction, and provenance. This provides the raw material for timing and
   // angular studies when reviewing the simulation output in ROOT.
+  // Ntuple 1: domhits
   analysisManager->CreateNtuple("domhits", "DOM photon hits");
   analysisManager->CreateNtupleIColumn("EventID");
   analysisManager->CreateNtupleIColumn("TrackID");
@@ -81,6 +98,19 @@ WaterTankRunAction::WaterTankRunAction()
   analysisManager->CreateNtupleDColumn("DirZ");
   analysisManager->FinishNtuple();
 
+  // Ntuple 2: scinthits - detailed scintillator hit information
+  analysisManager->CreateNtuple("scinthits", "Scintillator bar hits");
+  analysisManager->CreateNtupleIColumn("EventID");           // 0
+  analysisManager->CreateNtupleIColumn("Layer");             // 1
+  analysisManager->CreateNtupleIColumn("BarIndex");          // 2
+  analysisManager->CreateNtupleDColumn("Time_ns");           // 3
+  analysisManager->CreateNtupleDColumn("Edep_MeV");          // 4
+  analysisManager->CreateNtupleDColumn("PosX_cm");           // 5
+  analysisManager->CreateNtupleDColumn("PosY_cm");           // 6
+  analysisManager->CreateNtupleDColumn("PosZ_cm");           // 7
+  analysisManager->CreateNtupleIColumn("TrackID");           // 8
+  analysisManager->CreateNtupleIColumn("PDGCode");           // 9
+  analysisManager->FinishNtuple();
 }
 
 WaterTankRunAction::~WaterTankRunAction()

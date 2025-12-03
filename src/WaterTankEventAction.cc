@@ -5,6 +5,7 @@
 #include "WaterTankRunAction.hh"
 #include "WaterTankAnalysis.hh"
 #include "WaterTankDOMHit.hh"
+#include "WaterTankScintillatorHit.hh"
 
 #include "G4Event.hh"
 #include "G4RunManager.hh"
@@ -25,7 +26,8 @@ WaterTankEventAction::WaterTankEventAction(WaterTankRunAction* runAction)
   fRunAction(runAction),
   fEdep(0.),
   fDetectionCount(0),
-  fDOMHCID(-1)
+  fDOMHCID(-1),
+  fScintHCID(-1)
 {
 }
 
@@ -127,7 +129,88 @@ void WaterTankEventAction::EndOfEventAction(const G4Event* event)
     lastPhotonTime = -1.0;
   }
 
-  // Fill event ntuple with enhanced data
+  // ========================================
+  // Process Scintillator Hits
+  // ========================================
+  WaterTankScintillatorHitsCollection* scintHits = nullptr;
+  if (hce) {
+    if (fScintHCID < 0) {
+      fScintHCID = G4SDManager::GetSDMpointer()->GetCollectionID("ScintHitsCollection");
+    }
+    if (fScintHCID >= 0 && fScintHCID < hce->GetNumberOfCollections()) {
+      scintHits = static_cast<WaterTankScintillatorHitsCollection*>(hce->GetHC(fScintHCID));
+    }
+  }
+
+  G4int scintHitCount = (scintHits) ? static_cast<G4int>(scintHits->entries()) : 0;
+  G4int scintL0HitCount = 0;
+  G4int scintL1HitCount = 0;
+  G4double scintFirstTime = 1e9;
+  G4double scintL0FirstTime = 1e9;
+  G4double scintL1FirstTime = 1e9;
+  G4int scintL0FirstBar = -1;
+  G4int scintL1FirstBar = -1;
+  G4double scintTotalEdep = 0.0;
+
+  if (scintHits && scintHitCount > 0) {
+    for (G4int ihit = 0; ihit < scintHits->entries(); ++ihit) {
+      auto hit = (*scintHits)[ihit];
+      if (!hit) continue;
+      
+      G4double hitTime = hit->GetTime();
+      G4int layer = hit->GetLayer();
+      G4int barIndex = hit->GetBarIndex();
+      G4double edep = hit->GetEdep();
+      
+      scintTotalEdep += edep;
+      
+      // Track earliest hit overall
+      if (hitTime < scintFirstTime) {
+        scintFirstTime = hitTime;
+      }
+      
+      // Track per-layer statistics
+      if (layer == 0) {
+        scintL0HitCount++;
+        if (hitTime < scintL0FirstTime) {
+          scintL0FirstTime = hitTime;
+          scintL0FirstBar = barIndex;
+        }
+      } else if (layer == 1) {
+        scintL1HitCount++;
+        if (hitTime < scintL1FirstTime) {
+          scintL1FirstTime = hitTime;
+          scintL1FirstBar = barIndex;
+        }
+      }
+    }
+  }
+
+  // Reset unset times to -1 for clarity
+  if (scintFirstTime > 1e8) scintFirstTime = -1.0;
+  if (scintL0FirstTime > 1e8) scintL0FirstTime = -1.0;
+  if (scintL1FirstTime > 1e8) scintL1FirstTime = -1.0;
+
+  // Compute time-of-flight from scintillator to DOM
+  G4double tof = -1.0;
+  G4double tofL0 = -1.0;
+  G4double tofL1 = -1.0;
+  G4int scintCoincidence = 0;
+  
+  if (firstPhotonTime > 0 && scintFirstTime > 0) {
+    tof = firstPhotonTime - scintFirstTime;
+  }
+  if (firstPhotonTime > 0 && scintL0FirstTime > 0) {
+    tofL0 = firstPhotonTime - scintL0FirstTime;
+  }
+  if (firstPhotonTime > 0 && scintL1FirstTime > 0) {
+    tofL1 = firstPhotonTime - scintL1FirstTime;
+  }
+  if (scintL0HitCount > 0 && scintL1HitCount > 0) {
+    scintCoincidence = 1;
+  }
+
+  // Fill event ntuple with enhanced data (Ntuple 0)
   analysisManager->FillNtupleIColumn(0, 0, eventId);
   analysisManager->FillNtupleDColumn(0, 1, fEdep/GeV);
   analysisManager->FillNtupleIColumn(0, 2, fDetectionCount);
@@ -145,10 +228,24 @@ void WaterTankEventAction::EndOfEventAction(const G4Event* event)
   analysisManager->FillNtupleDColumn(0, 14, avgWavelength/nm);
   analysisManager->FillNtupleDColumn(0, 15, timeRMS/ns);
   analysisManager->FillNtupleDColumn(0, 16, timeMedian/ns);
+  // Scintillator fields
+  analysisManager->FillNtupleIColumn(0, 17, scintHitCount);
+  analysisManager->FillNtupleIColumn(0, 18, scintL0HitCount);
+  analysisManager->FillNtupleIColumn(0, 19, scintL1HitCount);
+  analysisManager->FillNtupleDColumn(0, 20, scintFirstTime/ns);
+  analysisManager->FillNtupleDColumn(0, 21, scintL0FirstTime/ns);
+  analysisManager->FillNtupleDColumn(0, 22, scintL1FirstTime/ns);
+  analysisManager->FillNtupleIColumn(0, 23, scintL0FirstBar);
+  analysisManager->FillNtupleIColumn(0, 24, scintL1FirstBar);
+  analysisManager->FillNtupleDColumn(0, 25, scintTotalEdep/MeV);
+  // TOF fields
+  analysisManager->FillNtupleDColumn(0, 26, tof/ns);
+  analysisManager->FillNtupleDColumn(0, 27, tofL0/ns);
+  analysisManager->FillNtupleDColumn(0, 28, tofL1/ns);
+  analysisManager->FillNtupleIColumn(0, 29, scintCoincidence);
   analysisManager->AddNtupleRow(0);
 
-  // Populate the hits ntuple with one row per DOM detection. Units are chosen
-  // to be human-friendly (ns, eV, nm, cm) for downstream analysis in ROOT.
+  // Populate the DOM hits ntuple (Ntuple 1) with one row per DOM detection.
   if (domHits) {
     for (G4int ihit = 0; ihit < domHits->entries(); ++ihit) {
       auto hit = (*domHits)[ihit];
@@ -168,6 +265,26 @@ void WaterTankEventAction::EndOfEventAction(const G4Event* event)
       analysisManager->FillNtupleDColumn(1, 10, dir.y());
       analysisManager->FillNtupleDColumn(1, 11, dir.z());
       analysisManager->AddNtupleRow(1);
+    }
+  }
+
+  // Populate the scintillator hits ntuple (Ntuple 2) with one row per hit.
+  if (scintHits) {
+    for (G4int ihit = 0; ihit < scintHits->entries(); ++ihit) {
+      auto hit = (*scintHits)[ihit];
+      if (!hit) continue;
+      analysisManager->FillNtupleIColumn(2, 0, eventId);
+      analysisManager->FillNtupleIColumn(2, 1, hit->GetLayer());
+      analysisManager->FillNtupleIColumn(2, 2, hit->GetBarIndex());
+      analysisManager->FillNtupleDColumn(2, 3, hit->GetTime()/ns);
+      analysisManager->FillNtupleDColumn(2, 4, hit->GetEdep()/MeV);
+      const auto& pos = hit->GetPosition();
+      analysisManager->FillNtupleDColumn(2, 5, pos.x()/cm);
+      analysisManager->FillNtupleDColumn(2, 6, pos.y()/cm);
+      analysisManager->FillNtupleDColumn(2, 7, pos.z()/cm);
+      analysisManager->FillNtupleIColumn(2, 8, hit->GetTrackID());
+      analysisManager->FillNtupleIColumn(2, 9, hit->GetPDGCode());
+      analysisManager->AddNtupleRow(2);
     }
   }
 }

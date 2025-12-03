@@ -9,13 +9,13 @@
 
 class WaterTankRunAction;
 
-/// Handles per-event bookkeeping, including DOM hit extraction.
+/// Handles per-event bookkeeping, including DOM and scintillator hit extraction.
 ///
 /// For every event we reset the running totals, collect the total energy
 /// deposited in the water scoring volume, and extract hits produced by
-/// the DOM sensitive detector. The run action receives the accumulated
-/// energy and the analysis manager records both scalar event summaries and
-/// detailed per-hit information.
+/// the DOM and scintillator sensitive detectors. The run action receives the
+/// accumulated energy and the analysis manager records event summaries,
+/// per-hit information, and time-of-flight calculations.
 
 class WaterTankEventAction : public G4UserEventAction
 {
@@ -37,6 +37,8 @@ class WaterTankEventAction : public G4UserEventAction
     G4int        fDetectionCount;
     /// Cached DOM hits collection ID to avoid repeated lookups.
     G4int        fDOMHCID;
+    /// Cached scintillator hits collection ID to avoid repeated lookups.
+    G4int        fScintHCID;
 };
 
 #endif

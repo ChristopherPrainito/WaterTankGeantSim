@@ -3,6 +3,7 @@
 // ========================================================
 // Comprehensive analysis and plotting of water tank simulation data
 // for IceCube DOM calibration studies with Cherenkov light detection
+// and scintillator array time-of-flight measurements
 // Run with: root -l analyze_watertank.C
 // Or from ROOT prompt: .x analyze_watertank.C
 
@@ -19,6 +20,7 @@
 #include <TF1.h>
 #include <TLine.h>
 #include <TLatex.h>
+#include <TBox.h>
 #include <iostream>
 #include <vector>
 #include <cmath>
@@ -26,6 +28,14 @@
 // Physical constants
 const double c_light = 29.9792458; // cm/ns (speed of light)
 const double DOM_RADIUS = 16.5;    // cm
+const double TANK_HALF_HEIGHT = 45.72; // cm (36" / 2)
+
+// Scintillator array geometry (must match DetectorConstruction)
+const int SCINT_BARS_PER_LAYER = 12;
+const double SCINT_BAR_LENGTH = 200.0;  // cm
+const double SCINT_BAR_WIDTH = 10.0;    // cm
+const double SCINT_LAYER0_Z = 55.72;    // cm (tank top + offset + half thickness)
+const double SCINT_LAYER1_Z = 62.72;    // cm (layer0 + spacing + thickness)
 
 // Refractive index of water as function of wavelength (nm)
 // Interpolated from simulation values
@@ -79,6 +89,14 @@ void analyze_watertank(const char* filename = "output_default.root") {
     
     std::cout << "Event tree entries: " << eventTree->GetEntries() << std::endl;
     std::cout << "DOM hits tree entries: " << domhitsTree->GetEntries() << std::endl;
+    
+    // Get scintillator hits tree (new)
+    TTree *scinthitsTree = (TTree*)file->Get("scinthits");
+    if (scinthitsTree) {
+        std::cout << "Scintillator hits tree entries: " << scinthitsTree->GetEntries() << std::endl;
+    } else {
+        std::cout << "Note: No scinthits tree found (may be older data format)" << std::endl;
+    }
     
     // Set ROOT style for better plots
     gStyle->SetOptStat(111111);
@@ -632,6 +650,336 @@ void analyze_watertank(const char* filename = "output_default.root") {
     c3->Print("water_tank_physics_analysis.png");
     
     // ========================================================
+    // Scintillator Array Analysis
+    // PURPOSE: Analyze scintillator bar trigger performance and hit patterns
+    // These plots characterize the cosmic ray muon trigger system
+    // ========================================================
+    
+    // Check if scintillator data is available in the event tree
+    bool hasScintData = (eventTree->GetBranch("ScintHitCount") != nullptr);
+    
+    if (hasScintData) {
+        TCanvas *c4 = new TCanvas("c4", "Scintillator Array Analysis", 1400, 900);
+        c4->Divide(3, 2);
+        c4->SetBorderMode(0);
+        
+        // 1. Scintillator hit multiplicity per event
+        c4->cd(1);
+        gPad->SetGrid(1,1);
+        gPad->SetTopMargin(0.15);
+        TH1F *h_scint_hits = new TH1F("h_scint_hits", "Scintillator Hit Multiplicity", 30, 0, 30);
+        h_scint_hits->SetXTitle("Number of Scintillator Hits per Event");
+        h_scint_hits->SetYTitle("Number of Events");
+        eventTree->Draw("ScintHitCount>>h_scint_hits", "", "");
+        h_scint_hits->SetFillColor(kOrange-3);
+        h_scint_hits->SetLineColor(kOrange+2);
+        h_scint_hits->SetLineWidth(2);
+        
+        // 2. Layer 0 vs Layer 1 hit correlation
+        c4->cd(2);
+        gPad->SetGrid(1,1);
+        gPad->SetTopMargin(0.15);
+        gPad->SetRightMargin(0.15);
+        TH2F *h_layer_corr = new TH2F("h_layer_corr", "Layer Hit Correlation (Coincidence Check)", 
+                                       15, 0, 15, 15, 0, 15);
+        h_layer_corr->SetXTitle("Layer 0 Hits (X-oriented bars)");
+        h_layer_corr->SetYTitle("Layer 1 Hits (Y-oriented bars)");
+        eventTree->Draw("ScintL1HitCount:ScintL0HitCount>>h_layer_corr", "", "colz");
+        
+        // 3. Scintillator trigger efficiency
+        c4->cd(3);
+        gPad->SetGrid(1,1);
+        gPad->SetTopMargin(0.15);
+        TH1F *h_scint_eff = new TH1F("h_scint_eff", "Scintillator Trigger Efficiency", 20, 0, 10);
+        TH1F *h_scint_total = new TH1F("h_scint_total", "", 20, 0, 10);
+        eventTree->Draw("PrimaryEnergy_GeV>>h_scint_total", "", "goff");
+        eventTree->Draw("PrimaryEnergy_GeV>>h_scint_eff", "ScintCoincidence==1", "goff");
+        h_scint_eff->Divide(h_scint_total);
+        h_scint_eff->SetXTitle("Primary Muon Energy [GeV]");
+        h_scint_eff->SetYTitle("Coincidence Trigger Efficiency");
+        h_scint_eff->SetMaximum(1.1);
+        h_scint_eff->SetMinimum(0.0);
+        h_scint_eff->SetFillColor(kCyan-3);
+        h_scint_eff->SetLineColor(kCyan+2);
+        h_scint_eff->SetLineWidth(2);
+        h_scint_eff->Draw();
+        
+        // 4. First hit bar distribution for Layer 0
+        c4->cd(4);
+        gPad->SetGrid(1,1);
+        gPad->SetTopMargin(0.15);
+        TH1F *h_l0_bar = new TH1F("h_l0_bar", "Layer 0 First Hit Bar Distribution", 12, -0.5, 11.5);
+        h_l0_bar->SetXTitle("Bar Index (Layer 0, X-oriented)");
+        h_l0_bar->SetYTitle("Number of Events");
+        eventTree->Draw("ScintL0FirstBar>>h_l0_bar", "ScintL0FirstBar>=0", "");
+        h_l0_bar->SetFillColor(kGreen-3);
+        h_l0_bar->SetLineColor(kGreen+2);
+        h_l0_bar->SetLineWidth(2);
+        
+        // 5. First hit bar distribution for Layer 1
+        c4->cd(5);
+        gPad->SetGrid(1,1);
+        gPad->SetTopMargin(0.15);
+        TH1F *h_l1_bar = new TH1F("h_l1_bar", "Layer 1 First Hit Bar Distribution", 12, -0.5, 11.5);
+        h_l1_bar->SetXTitle("Bar Index (Layer 1, Y-oriented)");
+        h_l1_bar->SetYTitle("Number of Events");
+        eventTree->Draw("ScintL1FirstBar>>h_l1_bar", "ScintL1FirstBar>=0", "");
+        h_l1_bar->SetFillColor(kMagenta-3);
+        h_l1_bar->SetLineColor(kMagenta+2);
+        h_l1_bar->SetLineWidth(2);
+        
+        // 6. Total scintillator energy deposition
+        c4->cd(6);
+        gPad->SetGrid(1,1);
+        gPad->SetTopMargin(0.15);
+        TH1F *h_scint_edep = new TH1F("h_scint_edep", "Total Scintillator Energy Deposit", 50, 0, 50);
+        h_scint_edep->SetXTitle("Energy Deposited [MeV]");
+        h_scint_edep->SetYTitle("Number of Events");
+        eventTree->Draw("ScintTotalEdep_MeV>>h_scint_edep", "ScintTotalEdep_MeV>0", "");
+        h_scint_edep->SetFillColor(kRed-3);
+        h_scint_edep->SetLineColor(kRed+2);
+        h_scint_edep->SetLineWidth(2);
+        
+        c4->Update();
+        c4->Print("water_tank_scintillator_analysis.png");
+        
+        // ========================================================
+        // Time-of-Flight Analysis
+        // PURPOSE: Measure and validate TOF from scintillator trigger to DOM detection
+        // Critical for understanding detector timing and muon velocity
+        // ========================================================
+        
+        TCanvas *c5 = new TCanvas("c5", "Time-of-Flight Analysis", 1400, 900);
+        c5->Divide(3, 2);
+        c5->SetBorderMode(0);
+        
+        // 1. TOF distribution (scintillator to DOM)
+        c5->cd(1);
+        gPad->SetGrid(1,1);
+        gPad->SetTopMargin(0.15);
+        TH1F *h_tof = new TH1F("h_tof", "Time-of-Flight: Scintillator to DOM", 100, -10, 50);
+        h_tof->SetXTitle("TOF [ns] (FirstPhotonTime - ScintFirstTime)");
+        h_tof->SetYTitle("Number of Events");
+        eventTree->Draw("TOF_ns>>h_tof", "TOF_ns>-100 && ScintCoincidence==1", "");
+        h_tof->SetFillColor(kBlue-3);
+        h_tof->SetLineColor(kBlue+2);
+        h_tof->SetLineWidth(2);
+        
+        // Add expected TOF line for vertical muon
+        // Distance from scint layer to DOM center ~60cm, light speed in water ~22.4 cm/ns
+        double expected_tof = (SCINT_LAYER0_Z + TANK_HALF_HEIGHT) / (c_light / 1.337);
+        TLine *tof_line = new TLine(expected_tof, 0, expected_tof, h_tof->GetMaximum()*0.8);
+        tof_line->SetLineColor(kRed);
+        tof_line->SetLineWidth(2);
+        tof_line->SetLineStyle(2);
+        tof_line->Draw("same");
+        
+        TLatex *lat_tof = new TLatex(expected_tof+2, h_tof->GetMaximum()*0.7, 
+                                     Form("Expected ~%.1f ns", expected_tof));
+        lat_tof->SetTextColor(kRed);
+        lat_tof->SetTextSize(0.03);
+        lat_tof->Draw();
+        
+        // 2. TOF from Layer 0 specifically
+        c5->cd(2);
+        gPad->SetGrid(1,1);
+        gPad->SetTopMargin(0.15);
+        TH1F *h_tof_l0 = new TH1F("h_tof_l0", "TOF from Layer 0 (X-oriented bars)", 100, -10, 50);
+        h_tof_l0->SetXTitle("TOF from Layer 0 [ns]");
+        h_tof_l0->SetYTitle("Number of Events");
+        eventTree->Draw("TOF_L0_ns>>h_tof_l0", "TOF_L0_ns>-100 && ScintL0HitCount>0", "");
+        h_tof_l0->SetFillColor(kGreen-3);
+        h_tof_l0->SetLineColor(kGreen+2);
+        h_tof_l0->SetLineWidth(2);
+        
+        // 3. TOF from Layer 1 specifically
+        c5->cd(3);
+        gPad->SetGrid(1,1);
+        gPad->SetTopMargin(0.15);
+        TH1F *h_tof_l1 = new TH1F("h_tof_l1", "TOF from Layer 1 (Y-oriented bars)", 100, -10, 50);
+        h_tof_l1->SetXTitle("TOF from Layer 1 [ns]");
+        h_tof_l1->SetYTitle("Number of Events");
+        eventTree->Draw("TOF_L1_ns>>h_tof_l1", "TOF_L1_ns>-100 && ScintL1HitCount>0", "");
+        h_tof_l1->SetFillColor(kMagenta-3);
+        h_tof_l1->SetLineColor(kMagenta+2);
+        h_tof_l1->SetLineWidth(2);
+        
+        // 4. TOF vs DOM hit count (correlation)
+        c5->cd(4);
+        gPad->SetGrid(1,1);
+        gPad->SetTopMargin(0.15);
+        gPad->SetRightMargin(0.15);
+        TH2F *h_tof_vs_hits = new TH2F("h_tof_vs_hits", "TOF vs DOM Hit Multiplicity", 
+                                        25, -5, 45, 25, 0, 2000);
+        h_tof_vs_hits->SetXTitle("TOF [ns]");
+        h_tof_vs_hits->SetYTitle("DOM Hit Count");
+        eventTree->Draw("DOMHitCount:TOF_ns>>h_tof_vs_hits", "TOF_ns>-100 && ScintCoincidence==1", "colz");
+        
+        // 5. Scintillator timing: Layer 0 vs Layer 1 first hit times
+        c5->cd(5);
+        gPad->SetGrid(1,1);
+        gPad->SetTopMargin(0.15);
+        gPad->SetRightMargin(0.15);
+        TH2F *h_scint_timing = new TH2F("h_scint_timing", "Scintillator Layer Timing Correlation", 
+                                         50, 0, 20, 50, 0, 20);
+        h_scint_timing->SetXTitle("Layer 0 First Hit Time [ns]");
+        h_scint_timing->SetYTitle("Layer 1 First Hit Time [ns]");
+        eventTree->Draw("ScintL1FirstTime_ns:ScintL0FirstTime_ns>>h_scint_timing", 
+                        "ScintL0FirstTime_ns>0 && ScintL1FirstTime_ns>0", "colz");
+        
+        // Add diagonal line for simultaneous hits
+        TF1 *diag = new TF1("diag", "x", 0, 20);
+        diag->SetLineColor(kRed);
+        diag->SetLineWidth(2);
+        diag->SetLineStyle(2);
+        diag->Draw("same");
+        
+        // 6. Layer timing difference (for muon direction)
+        c5->cd(6);
+        gPad->SetGrid(1,1);
+        gPad->SetTopMargin(0.15);
+        TH1F *h_layer_dt = new TH1F("h_layer_dt", "Time Difference Between Scintillator Layers", 100, -5, 5);
+        h_layer_dt->SetXTitle("#DeltaT (Layer1 - Layer0) [ns]");
+        h_layer_dt->SetYTitle("Number of Events");
+        eventTree->Draw("(ScintL1FirstTime_ns-ScintL0FirstTime_ns)>>h_layer_dt", 
+                        "ScintL0FirstTime_ns>0 && ScintL1FirstTime_ns>0", "");
+        h_layer_dt->SetFillColor(kOrange-3);
+        h_layer_dt->SetLineColor(kOrange+2);
+        h_layer_dt->SetLineWidth(2);
+        
+        // Add line at zero (simultaneous hits = vertical muon)
+        TLine *zero_line = new TLine(0, 0, 0, h_layer_dt->GetMaximum()*0.9);
+        zero_line->SetLineColor(kRed);
+        zero_line->SetLineWidth(2);
+        zero_line->SetLineStyle(2);
+        zero_line->Draw("same");
+        
+        c5->Update();
+        c5->Print("water_tank_tof_analysis.png");
+        
+        // ========================================================
+        // Combined Performance Analysis
+        // PURPOSE: Overall system performance with scintillator trigger
+        // ========================================================
+        
+        TCanvas *c6 = new TCanvas("c6", "Combined System Performance", 1400, 500);
+        c6->Divide(3, 1);
+        c6->SetBorderMode(0);
+        
+        // 1. DOM detection efficiency with scintillator coincidence requirement
+        c6->cd(1);
+        gPad->SetGrid(1,1);
+        gPad->SetTopMargin(0.15);
+        TH1F *h_dom_eff_coinc = new TH1F("h_dom_eff_coinc", "DOM Efficiency (with Scint Coincidence)", 20, 0, 10);
+        TH1F *h_coinc_total = new TH1F("h_coinc_total", "", 20, 0, 10);
+        eventTree->Draw("PrimaryEnergy_GeV>>h_coinc_total", "ScintCoincidence==1", "goff");
+        eventTree->Draw("PrimaryEnergy_GeV>>h_dom_eff_coinc", "ScintCoincidence==1 && DOMHitCount>10", "goff");
+        h_dom_eff_coinc->Divide(h_coinc_total);
+        h_dom_eff_coinc->SetXTitle("Primary Muon Energy [GeV]");
+        h_dom_eff_coinc->SetYTitle("DOM Detection Efficiency");
+        h_dom_eff_coinc->SetMaximum(1.1);
+        h_dom_eff_coinc->SetMinimum(0.0);
+        h_dom_eff_coinc->SetFillColor(kAzure-3);
+        h_dom_eff_coinc->SetLineColor(kAzure+2);
+        h_dom_eff_coinc->SetLineWidth(2);
+        h_dom_eff_coinc->Draw();
+        
+        // 2. TOF resolution (RMS) vs muon energy
+        c6->cd(2);
+        gPad->SetGrid(1,1);
+        gPad->SetTopMargin(0.15);
+        
+        // Create profile histogram for TOF vs energy
+        TProfile *p_tof_vs_energy = new TProfile("p_tof_vs_energy", "TOF vs Muon Energy", 10, 0, 10, -10, 60);
+        p_tof_vs_energy->SetXTitle("Primary Muon Energy [GeV]");
+        p_tof_vs_energy->SetYTitle("Mean TOF [ns]");
+        eventTree->Draw("TOF_ns:PrimaryEnergy_GeV>>p_tof_vs_energy", "TOF_ns>-100 && ScintCoincidence==1", "");
+        p_tof_vs_energy->SetMarkerStyle(20);
+        p_tof_vs_energy->SetMarkerColor(kBlue);
+        p_tof_vs_energy->SetLineColor(kBlue);
+        p_tof_vs_energy->SetLineWidth(2);
+        
+        // 3. Combined trigger and DOM efficiency
+        c6->cd(3);
+        gPad->SetGrid(1,1);
+        gPad->SetTopMargin(0.15);
+        TH1F *h_combined_eff = new TH1F("h_combined_eff", "Combined System Efficiency", 20, 0, 10);
+        TH1F *h_all_events = new TH1F("h_all_events", "", 20, 0, 10);
+        eventTree->Draw("PrimaryEnergy_GeV>>h_all_events", "", "goff");
+        eventTree->Draw("PrimaryEnergy_GeV>>h_combined_eff", "ScintCoincidence==1 && DOMHitCount>10", "goff");
+        h_combined_eff->Divide(h_all_events);
+        h_combined_eff->SetXTitle("Primary Muon Energy [GeV]");
+        h_combined_eff->SetYTitle("Overall System Efficiency");
+        h_combined_eff->SetMaximum(1.1);
+        h_combined_eff->SetMinimum(0.0);
+        h_combined_eff->SetFillColor(kTeal-3);
+        h_combined_eff->SetLineColor(kTeal+2);
+        h_combined_eff->SetLineWidth(2);
+        h_combined_eff->Draw();
+        
+        c6->Update();
+        c6->Print("water_tank_combined_performance.png");
+        
+    } else {
+        std::cout << "\nNote: Scintillator data not found in event tree." << std::endl;
+        std::cout << "Skipping scintillator and TOF analysis plots." << std::endl;
+    }
+    
+    // ========================================================
+    // Scintillator Hit-Level Analysis (if available)
+    // ========================================================
+    if (scinthitsTree && scinthitsTree->GetEntries() > 0) {
+        TCanvas *c7 = new TCanvas("c7", "Scintillator Hit Details", 1400, 500);
+        c7->Divide(3, 1);
+        c7->SetBorderMode(0);
+        
+        // 1. Hit position X-Y distribution
+        c7->cd(1);
+        gPad->SetGrid(1,1);
+        gPad->SetTopMargin(0.15);
+        gPad->SetRightMargin(0.15);
+        TH2F *h_scint_xy = new TH2F("h_scint_xy", "Scintillator Hit Positions (X-Y)", 
+                                     50, -120, 120, 50, -120, 120);
+        h_scint_xy->SetXTitle("X Position [cm]");
+        h_scint_xy->SetYTitle("Y Position [cm]");
+        scinthitsTree->Draw("PosY_cm:PosX_cm>>h_scint_xy", "", "colz");
+        
+        // Draw tank outline
+        TEllipse *tankCircle = new TEllipse(0, 0, 90.17, 90.17);
+        tankCircle->SetLineColor(kRed);
+        tankCircle->SetLineWidth(2);
+        tankCircle->SetFillStyle(0);
+        tankCircle->Draw("same");
+        
+        // 2. Energy deposit per hit
+        c7->cd(2);
+        gPad->SetGrid(1,1);
+        gPad->SetTopMargin(0.15);
+        TH1F *h_hit_edep = new TH1F("h_hit_edep", "Energy Deposit per Scintillator Hit", 100, 0, 10);
+        h_hit_edep->SetXTitle("Energy Deposit [MeV]");
+        h_hit_edep->SetYTitle("Number of Hits");
+        scinthitsTree->Draw("Edep_MeV>>h_hit_edep", "", "");
+        h_hit_edep->SetFillColor(kViolet-3);
+        h_hit_edep->SetLineColor(kViolet+2);
+        h_hit_edep->SetLineWidth(2);
+        
+        // 3. Hit time distribution
+        c7->cd(3);
+        gPad->SetGrid(1,1);
+        gPad->SetTopMargin(0.15);
+        TH1F *h_scint_time = new TH1F("h_scint_time", "Scintillator Hit Time Distribution", 100, 0, 30);
+        h_scint_time->SetXTitle("Hit Time [ns]");
+        h_scint_time->SetYTitle("Number of Hits");
+        scinthitsTree->Draw("Time_ns>>h_scint_time", "", "");
+        h_scint_time->SetFillColor(kSpring-3);
+        h_scint_time->SetLineColor(kSpring+2);
+        h_scint_time->SetLineWidth(2);
+        
+        c7->Update();
+        c7->Print("water_tank_scinthit_details.png");
+    }
+    
+    // ========================================================
     // Analysis Summary and Statistics
     // ========================================================
     std::cout << "\n=======================================" << std::endl;
@@ -677,12 +1025,47 @@ void analyze_watertank(const char* filename = "output_default.root") {
     std::cout << "Speed of light in water: " << c_light/1.337 << " cm/ns" << std::endl;
     std::cout << "DOM radius: " << DOM_RADIUS << " cm" << std::endl;
     
+    // Scintillator and TOF summary
+    if (hasScintData) {
+        std::cout << "\n--- Scintillator Array Statistics ---" << std::endl;
+        eventTree->Draw("ScintHitCount", "ScintHitCount>0", "goff");
+        TH1F *htemp2 = (TH1F*)gDirectory->Get("htemp");
+        if (htemp2) {
+            std::cout << "Average scintillator hits per event: " << htemp2->GetMean() << " +/- " << htemp2->GetRMS() << std::endl;
+        }
+        
+        eventTree->Draw("ScintCoincidence", "", "goff");
+        htemp2 = (TH1F*)gDirectory->Get("htemp");
+        if (htemp2) {
+            double coincRate = htemp2->GetMean() * 100;
+            std::cout << "Two-layer coincidence rate: " << coincRate << "%" << std::endl;
+        }
+        
+        eventTree->Draw("TOF_ns", "TOF_ns>-100 && ScintCoincidence==1", "goff");
+        htemp2 = (TH1F*)gDirectory->Get("htemp");
+        if (htemp2 && htemp2->GetEntries() > 0) {
+            std::cout << "Average TOF (coincidence events): " << htemp2->GetMean() << " +/- " << htemp2->GetRMS() << " ns" << std::endl;
+        }
+        
+        if (scinthitsTree) {
+            std::cout << "Total scintillator hits: " << scinthitsTree->GetEntries() << std::endl;
+        }
+    }
+    
     std::cout << "\nGenerated analysis plots:" << std::endl;
-    std::cout << "- water_tank_event_analysis.png    (6 event-level plots)" << std::endl;
-    std::cout << "- water_tank_timing_analysis.png   (3 timing statistics plots)" << std::endl;
-    std::cout << "- water_tank_photon_analysis.png   (6 photon-level plots)" << std::endl;
+    std::cout << "- water_tank_event_analysis.png       (6 event-level plots)" << std::endl;
+    std::cout << "- water_tank_timing_analysis.png      (3 timing statistics plots)" << std::endl;
+    std::cout << "- water_tank_photon_analysis.png      (6 photon-level plots)" << std::endl;
     std::cout << "- water_tank_cherenkov_validation.png (6 physics validation plots)" << std::endl;
-    std::cout << "- water_tank_physics_analysis.png  (2 performance plots)" << std::endl;
+    std::cout << "- water_tank_physics_analysis.png     (2 performance plots)" << std::endl;
+    if (hasScintData) {
+        std::cout << "- water_tank_scintillator_analysis.png (6 scintillator plots)" << std::endl;
+        std::cout << "- water_tank_tof_analysis.png          (6 time-of-flight plots)" << std::endl;
+        std::cout << "- water_tank_combined_performance.png  (3 system performance plots)" << std::endl;
+        if (scinthitsTree && scinthitsTree->GetEntries() > 0) {
+            std::cout << "- water_tank_scinthit_details.png      (3 hit-level plots)" << std::endl;
+        }
+    }
     std::cout << "=======================================" << std::endl;
     
     // Close file

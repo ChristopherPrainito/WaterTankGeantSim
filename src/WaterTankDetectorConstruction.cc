@@ -20,6 +20,7 @@
 #include "G4LogicalBorderSurface.hh"
 #include "G4PhysicalConstants.hh"
 #include "WaterTankDOMSD.hh"
+#include "WaterTankScintillatorSD.hh"
 #include "G4SDManager.hh"
 
 WaterTankDetectorConstruction::WaterTankDetectorConstruction()
@@ -28,7 +29,16 @@ WaterTankDetectorConstruction::WaterTankDetectorConstruction()
   fDOMLogicalVolume(nullptr),
   fWaterLogicalVolume(nullptr),
   fWaterPhysicalVolume(nullptr),
-  fDOMPhysicalVolume(nullptr)
+  fDOMPhysicalVolume(nullptr),
+  // Scintillator array default configuration
+  // Eljen EJ-200 style bars, sized to cover the tank
+  fScintBarsPerLayer(12),           // 12 bars per layer
+  fScintBarLength(200.*cm),         // 2m long bars
+  fScintBarWidth(10.*cm),           // 10cm wide
+  fScintBarThickness(2.*cm),        // 2cm thick
+  fScintBarGap(0.5*cm),             // 0.5cm gap between bars
+  fScintLayerOffset(10.*cm),        // 10cm above tank top
+  fScintLayerSpacing(5.*cm)         // 5cm between layers
 { }
 
 WaterTankDetectorConstruction::~WaterTankDetectorConstruction()
@@ -279,6 +289,101 @@ G4VPhysicalVolume* WaterTankDetectorConstruction::Construct()
   // Steps inside the water tank drive the energy deposition bookkeeping.
   fScoringVolume = logicTankWater;
 
+  // --------------------------------------------------------------
+  // Two-layer Scintillator Bar Array (Eljen EJ-200 style)
+  // Placed above the tank for cosmic ray muon triggering and TOF
+  // Layer 0: bars oriented along X-axis
+  // Layer 1: bars oriented along Y-axis (perpendicular lattice)
+  // --------------------------------------------------------------
+  
+  // Scintillator material: polyvinyltoluene base (EJ-200 approximation)
+  G4Material* matScintillator = nist->FindOrBuildMaterial("G4_PLASTIC_SC_VINYLTOLUENE");
+  
+  // Position of the scintillator array above the tank
+  G4double tankTopZ = halfHeight;  // Top of tank in world coordinates
+  
+  G4cout << "\n====== Scintillator Geometry Debug ======" << G4endl;
+  G4cout << "Tank halfHeight = " << halfHeight/CLHEP::cm << " cm" << G4endl;
+  G4cout << "Tank top Z = +" << tankTopZ/CLHEP::cm << " cm" << G4endl;
+  G4cout << "Tank bottom Z = " << -halfHeight/CLHEP::cm << " cm" << G4endl;
+  
+  // Calculate the total width of one layer of bars
+  G4double layerWidth = fScintBarsPerLayer * fScintBarWidth + (fScintBarsPerLayer - 1) * fScintBarGap;
+  
+  // Visualization attributes for scintillator bars
+  auto visScintL0 = new G4VisAttributes(G4Colour(0.0, 0.8, 0.2, 0.5)); // green, translucent
+  visScintL0->SetForceSolid(true);
+  auto visScintL1 = new G4VisAttributes(G4Colour(0.8, 0.2, 0.8, 0.5)); // purple, translucent
+  visScintL1->SetForceSolid(true);
+  
+  // Layer 0: bars along X-axis (long dimension in X, arrayed in Y)
+  G4double layer0Z = tankTopZ + fScintLayerOffset + fScintBarThickness/2.0;
+  
+  G4cout << "Layer offset from tank top = " << fScintLayerOffset/CLHEP::cm << " cm" << G4endl;
+  G4cout << "Layer 0 Z position = +" << layer0Z/CLHEP::cm << " cm (ABOVE tank top)" << G4endl;
+  
+  G4Box* solidScintBarL0 = new G4Box("ScintBarL0",
+    fScintBarLength/2.0,       // half-length in X
+    fScintBarWidth/2.0,        // half-width in Y
+    fScintBarThickness/2.0);   // half-thickness in Z
+  
+  G4LogicalVolume* logicScintBarL0 = new G4LogicalVolume(
+    solidScintBarL0, matScintillator, "ScintBarL0");
+  logicScintBarL0->SetVisAttributes(visScintL0);
+  fScintBarLogical.push_back(logicScintBarL0);
+  
+  // Place Layer 0 bars
+  for (G4int iBar = 0; iBar < fScintBarsPerLayer; ++iBar) {
+    G4double yPos = -layerWidth/2.0 + fScintBarWidth/2.0 + iBar * (fScintBarWidth + fScintBarGap);
+    G4ThreeVector barPos(0, yPos, layer0Z);
+    new G4PVPlacement(
+      0,                          // no rotation
+      barPos,                     // position
+      logicScintBarL0,            // logical volume
+      "ScintBarL0",               // name
+      logicWorld,                 // mother volume
+      false,                      // no boolean operation
+      iBar,                       // copy number = bar index
+      checkOverlaps);
+  }
+  
+  // Layer 1: bars along Y-axis (long dimension in Y, arrayed in X)
+  G4double layer1Z = layer0Z + fScintBarThickness/2.0 + fScintLayerSpacing + fScintBarThickness/2.0;
+  
+  G4cout << "Layer 1 Z position = +" << layer1Z/CLHEP::cm << " cm (ABOVE layer 0)" << G4endl;
+  G4cout << "==========================================\n" << G4endl;
+  
+  G4Box* solidScintBarL1 = new G4Box("ScintBarL1",
+    fScintBarWidth/2.0,        // half-width in X
+    fScintBarLength/2.0,       // half-length in Y
+    fScintBarThickness/2.0);   // half-thickness in Z
+  
+  G4LogicalVolume* logicScintBarL1 = new G4LogicalVolume(
+    solidScintBarL1, matScintillator, "ScintBarL1");
+  logicScintBarL1->SetVisAttributes(visScintL1);
+  fScintBarLogical.push_back(logicScintBarL1);
+  
+  // Place Layer 1 bars
+  for (G4int iBar = 0; iBar < fScintBarsPerLayer; ++iBar) {
+    G4double xPos = -layerWidth/2.0 + fScintBarWidth/2.0 + iBar * (fScintBarWidth + fScintBarGap);
+    G4ThreeVector barPos(xPos, 0, layer1Z);
+    new G4PVPlacement(
+      0,                          // no rotation
+      barPos,                     // position
+      logicScintBarL1,            // logical volume
+      "ScintBarL1",               // name
+      logicWorld,                 // mother volume
+      false,                      // no boolean operation
+      iBar,                       // copy number = bar index
+      checkOverlaps);
+  }
+  
+  G4cout << "Scintillator array constructed:" << G4endl;
+  G4cout << "  Bars per layer: " << fScintBarsPerLayer << G4endl;
+  G4cout << "  Bar dimensions: " << fScintBarLength/cm << " x " << fScintBarWidth/cm << " x " << fScintBarThickness/cm << " cm" << G4endl;
+  G4cout << "  Layer 0 (X-oriented) Z: " << layer0Z/cm << " cm" << G4endl;
+  G4cout << "  Layer 1 (Y-oriented) Z: " << layer1Z/cm << " cm" << G4endl;
+
   //
   //always return the physical World
   //
@@ -305,5 +410,19 @@ void WaterTankDetectorConstruction::ConstructSDandField()
   }
   if (fWaterLogicalVolume) {
     SetSensitiveDetector(fWaterLogicalVolume, domSD);
+  }
+  
+  // Create sensitive detector for scintillator bars. This records charged
+  // particle hits for triggering and time-of-flight measurements.
+  G4String ScintSDname = "WaterTank/ScintillatorSD";
+  WaterTankScintillatorSD* scintSD = new WaterTankScintillatorSD(ScintSDname, "ScintHitsCollection");
+  scintSD->SetEnergyThreshold(0.1*MeV);  // 0.1 MeV threshold
+  G4SDManager::GetSDMpointer()->AddNewDetector(scintSD);
+  
+  // Attach scintillator SD to both layer logical volumes
+  for (auto* logVol : fScintBarLogical) {
+    if (logVol) {
+      SetSensitiveDetector(logVol, scintSD);
+    }
   }
 }

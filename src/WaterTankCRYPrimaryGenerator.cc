@@ -149,11 +149,13 @@ void WaterTankCRYPrimaryGenerator::GeneratePrimaryVertex(G4Event* anEvent)
     fParticleGun->SetParticleDefinition(particleDefn);
     fParticleGun->SetParticleEnergy(cryParticle->ke() * MeV);
     
-    // Use CRY's natural position coordinates within the simulation volume
-    // CRY generates particles with realistic spatial and angular distributions
+    // Use CRY's position for X and Y, but place particles at the top of the
+    // simulation volume (above the scintillator array) for proper downward
+    // cosmic ray shower propagation. The scintillator is at Z~65cm, so we
+    // start at Z=2.5m to give particles room to develop.
     G4double x_pos = cryParticle->x() * m;
     G4double y_pos = cryParticle->y() * m;
-    G4double z_pos = cryParticle->z() * m;
+    G4double z_pos = 2.5 * m;  // Start above scintillator array
     
     fParticleGun->SetParticlePosition(G4ThreeVector(x_pos, y_pos, z_pos));
     fParticleGun->SetParticleMomentumDirection(G4ThreeVector(cryParticle->u(), 
